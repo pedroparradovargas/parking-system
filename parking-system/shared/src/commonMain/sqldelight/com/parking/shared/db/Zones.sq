@@ -1,0 +1,27 @@
+-- Zonas físicas con capacidad y ocupación actual.
+
+CREATE TABLE IF NOT EXISTS zones (
+    id                  TEXT NOT NULL PRIMARY KEY,
+    parking_id          TEXT NOT NULL,
+    code                TEXT NOT NULL,
+    capacity            INTEGER NOT NULL,
+    current_occupancy   INTEGER NOT NULL DEFAULT 0,
+    allowed_types_csv   TEXT NOT NULL DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_zones_parking ON zones(parking_id);
+
+selectByParking:
+SELECT * FROM zones WHERE parking_id = ?;
+
+incrementOccupancy:
+UPDATE zones SET current_occupancy = current_occupancy + :delta WHERE id = :id;
+
+upsert:
+INSERT INTO zones(id, parking_id, code, capacity, current_occupancy, allowed_types_csv)
+VALUES (?, ?, ?, ?, ?, ?)
+ON CONFLICT(id) DO UPDATE SET
+    code              = excluded.code,
+    capacity          = excluded.capacity,
+    current_occupancy = excluded.current_occupancy,
+    allowed_types_csv = excluded.allowed_types_csv;

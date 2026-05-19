@@ -1,0 +1,24 @@
+-- Auditoría inmutable con hash chain.
+
+CREATE TABLE IF NOT EXISTS audit (
+    id              TEXT NOT NULL PRIMARY KEY,
+    ts_ms           INTEGER NOT NULL,
+    action          TEXT NOT NULL,
+    entity          TEXT NOT NULL,
+    entity_id       TEXT NOT NULL,
+    payload         TEXT NOT NULL,
+    prev_hash       TEXT,
+    current_hash    TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit(ts_ms);
+
+insert:
+INSERT INTO audit(id, ts_ms, action, entity, entity_id, payload, prev_hash, current_hash)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+selectLast:
+SELECT * FROM audit ORDER BY ts_ms DESC LIMIT 1;
+
+selectRange:
+SELECT * FROM audit WHERE ts_ms BETWEEN :from_ms AND :to_ms ORDER BY ts_ms ASC;

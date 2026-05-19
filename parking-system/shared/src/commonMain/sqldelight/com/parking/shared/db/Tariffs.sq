@@ -1,0 +1,41 @@
+-- Catálogo local de tarifas (replicado desde el servidor).
+
+CREATE TABLE IF NOT EXISTS tariffs (
+    id                      TEXT NOT NULL PRIMARY KEY,
+    parking_id              TEXT NOT NULL,
+    vehicle_type            TEXT NOT NULL,
+    first_hour_cents        INTEGER NOT NULL,
+    subsequent_hour_cents   INTEGER NOT NULL,
+    night_surcharge_percent INTEGER NOT NULL DEFAULT 0,
+    night_from              TEXT NOT NULL DEFAULT '22:00',
+    night_to                TEXT NOT NULL DEFAULT '06:00',
+    grace_minutes           INTEGER NOT NULL DEFAULT 15,
+    iva_percent             INTEGER NOT NULL DEFAULT 19,
+    valid_from_ms           INTEGER NOT NULL,
+    valid_to_ms             INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_tariffs_parking ON tariffs(parking_id);
+
+selectByParking:
+SELECT * FROM tariffs WHERE parking_id = ?;
+
+selectForVehicleType:
+SELECT * FROM tariffs WHERE parking_id = ? AND vehicle_type = ?
+ORDER BY valid_from_ms DESC LIMIT 1;
+
+upsert:
+INSERT INTO tariffs(id, parking_id, vehicle_type, first_hour_cents, subsequent_hour_cents,
+    night_surcharge_percent, night_from, night_to, grace_minutes, iva_percent, valid_from_ms, valid_to_ms)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(id) DO UPDATE SET
+    vehicle_type            = excluded.vehicle_type,
+    first_hour_cents        = excluded.first_hour_cents,
+    subsequent_hour_cents   = excluded.subsequent_hour_cents,
+    night_surcharge_percent = excluded.night_surcharge_percent,
+    night_from              = excluded.night_from,
+    night_to                = excluded.night_to,
+    grace_minutes           = excluded.grace_minutes,
+    iva_percent             = excluded.iva_percent,
+    valid_from_ms           = excluded.valid_from_ms,
+    valid_to_ms             = excluded.valid_to_ms;

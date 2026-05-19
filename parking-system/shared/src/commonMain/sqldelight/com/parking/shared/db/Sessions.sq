@@ -1,0 +1,34 @@
+-- Sesiones de parqueo abiertas y cerradas localmente.
+
+CREATE TABLE IF NOT EXISTS sessions (
+    id                  TEXT NOT NULL PRIMARY KEY,
+    parking_id          TEXT NOT NULL,
+    plate               TEXT NOT NULL,
+    vehicle_type        TEXT NOT NULL,
+    zone_id             TEXT,
+    entry_at_ms         INTEGER NOT NULL,
+    exit_at_ms          INTEGER,
+    status              TEXT NOT NULL DEFAULT 'ACTIVE',
+    customer_id         TEXT,
+    operator_user_id    TEXT,
+    entry_gate          TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_sessions_active ON sessions(parking_id, status);
+CREATE INDEX IF NOT EXISTS idx_sessions_plate ON sessions(parking_id, plate);
+
+selectActive:
+SELECT * FROM sessions WHERE parking_id = ? AND status = 'ACTIVE'
+ORDER BY entry_at_ms DESC;
+
+selectActiveByPlate:
+SELECT * FROM sessions WHERE parking_id = ? AND plate = ? AND status = 'ACTIVE'
+LIMIT 1;
+
+insert:
+INSERT INTO sessions(id, parking_id, plate, vehicle_type, zone_id, entry_at_ms, exit_at_ms,
+    status, customer_id, operator_user_id, entry_gate)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+close:
+UPDATE sessions SET exit_at_ms = :exit_at_ms, status = :status WHERE id = :id;

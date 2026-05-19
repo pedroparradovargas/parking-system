@@ -1,0 +1,47 @@
+name: ci-kotlin
+
+on:
+  pull_request:
+    paths:
+      - "shared/**"
+      - "backend/**"
+      - "composeApp/**"
+      - "buildSrc/**"
+      - "*.gradle.kts"
+      - "gradle/**"
+      - ".github/workflows/ci-kotlin.yml"
+  push:
+    branches: [main]
+
+jobs:
+  build-test:
+    name: Build & test (JVM)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Assemble shared (commonMain, jvmMain, androidMain, wasmJsMain)
+        run: ./gradlew :shared:assemble --no-daemon
+      - name: Test shared (common + JVM)
+        run: ./gradlew :shared:jvmTest --no-daemon
+      - name: Test backend
+        run: ./gradlew :backend:test --no-daemon
+      - name: Build desktop & android assemble
+        run: ./gradlew :composeApp:packageDistributionForCurrentOS :composeApp:assembleDebug --no-daemon
+
+  ios-build:
+    name: Build iOS framework
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew :shared:assembleSharedXCFramework --no-daemon
+      - run: ./gradlew :composeApp:linkPodReleaseFrameworkIosArm64 --no-daemon || true

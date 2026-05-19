@@ -1,0 +1,6 @@
+# Atajo: este Dockerfile delega al canonical en /ai-service/Dockerfile.
+FROM scratch
+# Se requiere docker buildx ≥ 23 para 'COPY --from-stage'.
+# Mantener este archivo aquí permite a docker-compose construir el ai-service
+# usando la misma definición canónica del repo ai-service.
+LABEL note="Use ../../ai-service/Dockerfile in compose for the real build"

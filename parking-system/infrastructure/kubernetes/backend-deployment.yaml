@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 3
+  selector: { matchLabels: { app: backend } }
+  template:
+    metadata: { labels: { app: backend } }
+    spec:
+      containers:
+        - name: backend
+          image: ghcr.io/parking/backend:latest
+          ports: [{ containerPort: 8080 }]
+          env:
+            - { name: DATABASE_URL, value: "jdbc:postgresql://postgres:5432/parking?sslmode=require" }
+            - { name: AI_SERVICE_URL, value: "http://ai-service:8000" }
+          envFrom:
+            - secretRef: { name: postgres-secret }
+            - secretRef: { name: backend-secret }
+          readinessProbe:
+            httpGet: { path: /readyz, port: 8080 }
+            initialDelaySeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+            periodSeconds: 30
+          resources:
+            requests: { cpu: "250m", memory: "512Mi" }
+            limits:   { cpu: "2",    memory: "2Gi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+spec:
+  selector: { app: backend }
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: backend-secret
+type: Opaque
+stringData:
+  JWT_SECRET: replace-with-strong-secret-in-prod

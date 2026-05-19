@@ -1,0 +1,34 @@
+-- Outbox de recibos pendientes de sincronizar al servidor.
+
+CREATE TABLE IF NOT EXISTS receipts (
+    id                  TEXT NOT NULL PRIMARY KEY,
+    session_id          TEXT NOT NULL,
+    parking_id          TEXT NOT NULL,
+    local_id            TEXT NOT NULL UNIQUE,
+    sequence_local      TEXT NOT NULL,
+    issued_at_ms        INTEGER NOT NULL,
+    subtotal_cents      INTEGER NOT NULL,
+    iva_cents           INTEGER NOT NULL,
+    total_cents         INTEGER NOT NULL,
+    cufe                TEXT,
+    sync_status         TEXT NOT NULL DEFAULT 'PENDING',
+    server_id           TEXT,
+    last_error          TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_receipts_pending ON receipts(parking_id, sync_status);
+
+insert:
+INSERT INTO receipts(id, session_id, parking_id, local_id, sequence_local, issued_at_ms,
+    subtotal_cents, iva_cents, total_cents, cufe, sync_status, server_id)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectPending:
+SELECT * FROM receipts WHERE parking_id = ? AND sync_status = ?
+ORDER BY issued_at_ms ASC;
+
+markSynced:
+UPDATE receipts SET server_id = :server_id, sync_status = :sync_status WHERE local_id = :local_id;
+
+markConflict:
+UPDATE receipts SET last_error = :last_error, sync_status = :sync_status WHERE local_id = :local_id;

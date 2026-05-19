@@ -1,0 +1,332 @@
+openapi: 3.0.3
+info:
+  title: Parking System API
+  version: 1.0.0
+  description: |
+    API REST + WebSocket del sistema de gestión de parqueaderos.
+    Todas las rutas REST que no sean /healthz, /readyz o /api/v1/auth/*
+    requieren Bearer JWT obtenido por /api/v1/auth/login.
+servers:
+  - url: https://api.parking.example.com
+  - url: http://localhost:8080
+
+paths:
+  /healthz:
+    get:
+      summary: Liveness probe
+      responses: { "200": { description: ok } }
+  /readyz:
+    get:
+      summary: Readiness probe
+      responses: { "200": { description: ready } }
+
+  /api/v1/auth/login:
+    post:
+      summary: Login con usuario, contraseña y opcionalmente TOTP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginRequest" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoginResponse" }
+        "401":
+          description: Credenciales inválidas o TOTP requerido
+
+  /api/v1/auth/refresh:
+    post:
+      summary: Rotación de refresh token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoginResponse" }
+
+  /api/v1/sessions:
+    post:
+      summary: Abrir sesión de parqueo
+      security: [{ bearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SessionDto" }
+      responses:
+        "201":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SessionDto" }
+  /api/v1/sessions/active:
+    get:
+      summary: Listar sesiones activas del parking del JWT
+      security: [{ bearer: [] }]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/SessionDto" }
+  /api/v1/sessions/{sessionId}/close:
+    post:
+      summary: Cerrar sesión y registrar cobro
+      security: [{ bearer: [] }]
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SessionDto" }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SessionDto" }
+
+  /api/v1/sync/push:
+    post:
+      summary: Subir outbox del cliente (idempotente por localId)
+      security: [{ bearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SyncPushRequest" }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SyncPushResponse" }
+  /api/v1/sync/pull:
+    get:
+      summary: Obtener cambios desde un timestamp
+      security: [{ bearer: [] }]
+      parameters:
+        - { in: query, name: parkingId, required: true, schema: { type: string } }
+        - { in: query, name: since,     required: true, schema: { type: integer, format: int64 } }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SyncPullResponse" }
+
+  /api/v1/parkings/{parkingId}/tariffs:
+    get:
+      security: [{ bearer: [] }]
+      parameters:
+        - { in: path, name: parkingId, required: true, schema: { type: string } }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/TariffDto" }
+
+  /api/v1/parkings/{parkingId}/zones:
+    get:
+      security: [{ bearer: [] }]
+      parameters:
+        - { in: path, name: parkingId, required: true, schema: { type: string } }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ZoneDto" }
+
+  /api/v1/parkings/{parkingId}/reports/revenue:
+    get:
+      security: [{ bearer: [] }]
+      parameters:
+        - { in: path,  name: parkingId, required: true, schema: { type: string } }
+        - { in: query, name: from,      required: true, schema: { type: string } }
+        - { in: query, name: to,        required: true, schema: { type: string } }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RevenueReportDto" }
+
+  /api/v1/parkings/{parkingId}/reports/occupancy:
+    get:
+      security: [{ bearer: [] }]
+      parameters:
+        - { in: path, name: parkingId, required: true, schema: { type: string } }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OccupancyReportDto" }
+
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string }
+        password: { type: string, format: password }
+        totpCode: { type: string }
+    LoginResponse:
+      type: object
+      required: [accessToken, refreshToken, expiresInSeconds, user]
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+        expiresInSeconds: { type: integer, format: int64 }
+        user: { $ref: "#/components/schemas/UserDto" }
+    UserDto:
+      type: object
+      properties:
+        id: { type: string }
+        username: { type: string }
+        fullName: { type: string }
+        email: { type: string }
+        roles: { type: array, items: { type: string } }
+        parkingId: { type: string }
+        requires2fa: { type: boolean }
+    SessionDto:
+      type: object
+      required: [id, localId, parkingId, plate, vehicleType, entryAtMillis, status]
+      properties:
+        id: { type: string }
+        localId: { type: string }
+        parkingId: { type: string }
+        plate: { type: string }
+        vehicleType: { type: string, enum: [CAR, MOTORCYCLE, BICYCLE, TRUCK, BUS] }
+        zoneId: { type: string, nullable: true }
+        entryAtMillis: { type: integer, format: int64 }
+        exitAtMillis: { type: integer, format: int64, nullable: true }
+        status: { type: string, enum: [ACTIVE, CLOSED, CANCELLED, RESERVED] }
+        operatorUserId: { type: string, nullable: true }
+        entryGate: { type: string, nullable: true }
+        totalCents: { type: integer, format: int64, nullable: true }
+        ivaCents: { type: integer, format: int64, nullable: true }
+    ReceiptDto:
+      type: object
+      properties:
+        id: { type: string }
+        sessionId: { type: string }
+        localId: { type: string }
+        parkingId: { type: string }
+        sequenceLocal: { type: string }
+        issuedAtMillis: { type: integer, format: int64 }
+        subtotalCents: { type: integer, format: int64 }
+        ivaCents: { type: integer, format: int64 }
+        totalCents: { type: integer, format: int64 }
+        cufe: { type: string, nullable: true }
+    SyncPushRequest:
+      type: object
+      required: [deviceId, parkingId]
+      properties:
+        deviceId: { type: string }
+        parkingId: { type: string }
+        sessions:
+          type: array
+          items: { $ref: "#/components/schemas/SessionDto" }
+        receipts:
+          type: array
+          items: { $ref: "#/components/schemas/ReceiptDto" }
+    SyncPushResponse:
+      type: object
+      properties:
+        accepted:
+          type: array
+          items:
+            type: object
+            properties:
+              localId: { type: string }
+              serverId: { type: string }
+        conflicts: { type: array }
+        rejected: { type: array }
+    SyncPullResponse:
+      type: object
+      properties:
+        sinceMillis: { type: integer, format: int64 }
+        nowMillis: { type: integer, format: int64 }
+        tariffs: { type: array, items: { $ref: "#/components/schemas/TariffDto" } }
+        zones: { type: array, items: { $ref: "#/components/schemas/ZoneDto" } }
+        customersChanged: { type: integer }
+    TariffDto:
+      type: object
+      properties:
+        id: { type: string }
+        parkingId: { type: string }
+        vehicleType: { type: string }
+        firstHourCents: { type: integer, format: int64 }
+        subsequentHourCents: { type: integer, format: int64 }
+        nightSurchargePercent: { type: integer }
+        nightFromIso: { type: string }
+        nightToIso: { type: string }
+        graceMinutes: { type: integer }
+        ivaPercent: { type: integer }
+        validFromMillis: { type: integer, format: int64 }
+        validToMillis: { type: integer, format: int64, nullable: true }
+    ZoneDto:
+      type: object
+      properties:
+        id: { type: string }
+        parkingId: { type: string }
+        code: { type: string }
+        capacity: { type: integer }
+        currentOccupancy: { type: integer }
+        allowedVehicleTypes: { type: array, items: { type: string } }
+    RevenueReportDto:
+      type: object
+      properties:
+        parkingId: { type: string }
+        fromIso: { type: string }
+        toIso: { type: string }
+        totalRevenueCents: { type: integer, format: int64 }
+        totalIvaCents: { type: integer, format: int64 }
+        sessionsCount: { type: integer }
+        byVehicleType:
+          type: object
+          additionalProperties: { type: integer, format: int64 }
+        byDay:
+          type: array
+          items:
+            type: object
+            properties:
+              dayIso: { type: string }
+              revenueCents: { type: integer, format: int64 }
+              sessions: { type: integer }
+    OccupancyReportDto:
+      type: object
+      properties:
+        parkingId: { type: string }
+        capacityTotal: { type: integer }
+        currentOccupancy: { type: integer }
+        byZone:
+          type: array
+          items:
+            type: object
+            properties:
+              zoneCode: { type: string }
+              capacity: { type: integer }
+              occupancy: { type: integer }
+        percentage: { type: number, format: double }

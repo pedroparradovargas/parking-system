@@ -1,0 +1,31 @@
+-- Catálogo de clientes / mensualistas.
+
+CREATE TABLE IF NOT EXISTS customers (
+    id                  TEXT NOT NULL PRIMARY KEY,
+    parking_id          TEXT NOT NULL,
+    full_name           TEXT NOT NULL,
+    document_number     TEXT NOT NULL,
+    email               TEXT,
+    phone               TEXT,
+    has_active_monthly  INTEGER NOT NULL DEFAULT 0,
+    monthly_expires_ms  INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_customers_doc ON customers(parking_id, document_number);
+
+selectByDocument:
+SELECT * FROM customers WHERE parking_id = ? AND document_number = ?;
+
+selectMonthlyHolders:
+SELECT * FROM customers WHERE parking_id = ? AND has_active_monthly = 1;
+
+upsert:
+INSERT INTO customers(id, parking_id, full_name, document_number, email, phone, has_active_monthly, monthly_expires_ms)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(id) DO UPDATE SET
+    full_name           = excluded.full_name,
+    document_number     = excluded.document_number,
+    email               = excluded.email,
+    phone               = excluded.phone,
+    has_active_monthly  = excluded.has_active_monthly,
+    monthly_expires_ms  = excluded.monthly_expires_ms;

@@ -1,0 +1,19 @@
+-- ========================================================================
+-- ParkingDatabase.sq — archivo "raíz" del schema offline-first.
+--
+-- SQLDelight permite distribuir CREATE TABLE entre varios .sq dentro
+-- del mismo paquete; este archivo SÓLO contiene metadatos/version.
+-- Cada tabla vive en su propio archivo para mantener cohesión:
+--    Tariffs.sq, Zones.sq, Customers.sq, Sessions.sq, Receipts.sq, Audit.sq
+-- ========================================================================
+
+CREATE TABLE IF NOT EXISTS schema_meta (
+    key   TEXT NOT NULL PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
+selectVersion:
+SELECT value FROM schema_meta WHERE key = 'version';
+
+setVersion:
+INSERT OR REPLACE INTO schema_meta(key, value) VALUES ('version', :value);

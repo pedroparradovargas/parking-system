@@ -1,0 +1,88 @@
+# =============================================================================
+# .gitignore — Kotlin + Android + iOS + Node + Python + IntelliJ
+# =============================================================================
+
+# --- Gradle / Kotlin / JVM ---
+.gradle/
+build/
+out/
+*.class
+*.jar
+*.war
+*.ear
+hs_err_pid*
+replay_pid*
+local.properties
+
+# --- IntelliJ / Android Studio ---
+# Sí versionamos .idea/runConfigurations y .idea/codeStyles
+.idea/*
+!.idea/runConfigurations/
+!.idea/codeStyles/
+!.idea/misc.xml
+!.idea/gradle.xml
+!.idea/kotlinc.xml
+*.iml
+*.iws
+*.ipr
+
+# --- Android ---
+*.apk
+*.aab
+*.ap_
+*.dex
+captures/
+.cxx/
+
+# --- iOS / Xcode ---
+*.xcuserstate
+*.xcuserdatad
+xcuserdata/
+DerivedData/
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+Pods/
+.swiftpm/
+iosApp/iosApp.xcodeproj/project.xcworkspace/xcuserdata/
+iosApp/iosApp.xcodeproj/xcuserdata/
+
+# --- Node / Next.js ---
+node_modules/
+.next/
+.next-build/
+.pnp.*
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.so
+
+# --- Docker ---
+.dockerignore.bak
+
+# --- SO ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Secretos ---
+*.pem
+*.key
+*.crt
+.env
+secrets/

@@ -1,0 +1,13 @@
+// Configuración base del proyecto iOS.
+// Ajusta el TEAM_ID y el bundle identifier antes de archivar para App Store.
+
+TEAM_ID =
+BUNDLE_ID = com.parking.app.iosApp
+APP_NAME = ParkingSystem
+DEVELOPMENT_LANGUAGE = es
+
+// Min iOS 15 — coincide con el target de Compose Multiplatform.
+IPHONEOS_DEPLOYMENT_TARGET = 15.0
+TARGETED_DEVICE_FAMILY = 1,2
+SWIFT_VERSION = 5.9
+ENABLE_BITCODE = NO

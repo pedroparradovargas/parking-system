@@ -1,0 +1,113 @@
+# =============================================================================
+# .gitignore — Kotlin Multiplatform + Android + iOS + Node + Python + IntelliJ
+# =============================================================================
+
+# --- Gradle / Kotlin / JVM ---
+.gradle/
+**/.gradle/
+build/
+**/build/
+out/
+**/out/
+*.class
+*.jar
+*.war
+*.ear
+hs_err_pid*
+replay_pid*
+local.properties
+**/local.properties
+.kotlin/
+**/.kotlin/
+kotlin-js-store/
+**/kotlin-js-store/
+*.log
+
+# --- IntelliJ / Android Studio ---
+# Sí versionamos .idea/runConfigurations y .idea/codeStyles
+.idea/*
+!.idea/runConfigurations/
+!.idea/codeStyles/
+!.idea/misc.xml
+!.idea/gradle.xml
+!.idea/kotlinc.xml
+*.iml
+*.iws
+*.ipr
+
+# --- Android ---
+*.apk
+*.aab
+*.ap_
+*.dex
+captures/
+.cxx/
+.externalNativeBuild/
+
+# --- iOS / Xcode ---
+*.xcuserstate
+*.xcuserdatad
+xcuserdata/
+DerivedData/
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+Pods/
+.swiftpm/
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+!*.xcodeproj/project.xcworkspace/
+!*.xcworkspace/contents.xcworkspacedata
+**/xcshareddata/WorkspaceSettings.xcsettings
+
+# --- Node / Next.js ---
+node_modules/
+**/node_modules/
+.next/
+.next-build/
+.pnp.*
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# --- Python ---
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.so
+
+# --- Docker ---
+.dockerignore.bak
+
+# --- SO ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Secretos ---
+*.pem
+*.key
+*.crt
+.env
+secrets/
+
+# --- Claude Code (uso local, no se versiona) ---
+.claude/
+memory/
+
+# --- Logs y artefactos de desarrollo del workspace ---
+build-all.log
+build-shared.log
+run-desktop.log
