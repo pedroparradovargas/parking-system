@@ -10,8 +10,8 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.greater
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.javatime.time
 import org.jetbrains.exposed.sql.javatime.timestamp
-import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.Instant
@@ -38,8 +38,8 @@ private object TariffsT : Table("tariffs") {
     val firstHourCents = long("first_hour_cents")
     val subsequentHourCents = long("subsequent_hour_cents")
     val nightSurchargePercent = integer("night_surcharge_percent")
-    val nightFrom = org.jetbrains.exposed.sql.javatime.time("night_from")
-    val nightTo = org.jetbrains.exposed.sql.javatime.time("night_to")
+    val nightFrom = time("night_from")
+    val nightTo = time("night_to")
     val graceMinutes = integer("grace_minutes")
     val ivaPercent = integer("iva_percent")
     val validFrom = timestamp("valid_from")
@@ -61,7 +61,8 @@ object SyncRepository {
     /** Idempotente: si `local_id` ya existe en `receipts`, devuelve su `id`. */
     fun upsertReceipt(dto: ReceiptDto, deviceId: String): String = transaction {
         val existing = ReceiptsT
-            .select { ReceiptsT.parkingId eq UUID.fromString(dto.parkingId) and (ReceiptsT.localId eq UUID.fromString(dto.localId)) }
+            .selectAll()
+            .where { ReceiptsT.parkingId eq UUID.fromString(dto.parkingId) and (ReceiptsT.localId eq UUID.fromString(dto.localId)) }
             .singleOrNull()
         if (existing != null) return@transaction existing[ReceiptsT.id].toString()
 
@@ -82,7 +83,7 @@ object SyncRepository {
     }
 
     fun tariffsSince(parkingId: String, sinceMillis: Long): List<TariffDto> = transaction {
-        TariffsT.select {
+        TariffsT.selectAll().where {
             TariffsT.parkingId eq UUID.fromString(parkingId) and
                 (TariffsT.validFrom greaterEq Instant.ofEpochMilli(sinceMillis))
         }.map { row ->
@@ -104,7 +105,7 @@ object SyncRepository {
     }
 
     fun zonesSnapshot(parkingId: String): List<ZoneDto> = transaction {
-        ZonesT.select { ZonesT.parkingId eq UUID.fromString(parkingId) }.map { row ->
+        ZonesT.selectAll().where { ZonesT.parkingId eq UUID.fromString(parkingId) }.map { row ->
             ZoneDto(
                 id = row[ZonesT.id].toString(),
                 parkingId = parkingId,

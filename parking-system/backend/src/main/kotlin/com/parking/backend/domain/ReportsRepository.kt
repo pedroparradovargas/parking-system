@@ -6,7 +6,7 @@ import com.parking.shared.data.api.dto.RevenueReportDto
 import com.parking.shared.data.api.dto.ZoneOccupancy
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.select
+import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.Instant
 import java.time.LocalDate
@@ -23,7 +23,7 @@ object ReportsRepository {
     fun revenue(parkingId: String, fromIso: String, toIso: String): RevenueReportDto = transaction {
         val from = parseDateOrEpoch(fromIso, default = Instant.now().minusSeconds(86400 * 30))
         val to = parseDateOrEpoch(toIso, default = Instant.now())
-        val rows = ParkingSessionsT.select {
+        val rows = ParkingSessionsT.selectAll().where {
             ParkingSessionsT.parkingId eq UUID.fromString(parkingId) and
                 (ParkingSessionsT.exitAt greaterEqNullable from) and
                 (ParkingSessionsT.exitAt lessEqNullable to)
@@ -58,7 +58,7 @@ object ReportsRepository {
     }
 
     fun occupancy(parkingId: String): OccupancyReportDto = transaction {
-        val zones = ZonesT.select { ZonesT.parkingId eq UUID.fromString(parkingId) }.toList()
+        val zones = ZonesT.selectAll().where { ZonesT.parkingId eq UUID.fromString(parkingId) }.toList()
         val capacityTotal = zones.sumOf { it[ZonesT.capacity] }
         val occupancyTotal = zones.sumOf { it[ZonesT.currentOccupancy] }
         OccupancyReportDto(

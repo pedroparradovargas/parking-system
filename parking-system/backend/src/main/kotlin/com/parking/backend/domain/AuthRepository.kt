@@ -5,7 +5,7 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.javatime.timestamp
-import org.jetbrains.exposed.sql.select
+import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
 import java.security.MessageDigest
@@ -66,10 +66,10 @@ private object RefreshTokensT : Table("refresh_tokens") {
 object AuthRepository {
 
     fun findByUsername(username: String): AuthUser? = transaction {
-        val row = UsersT.select { UsersT.username eq username }.singleOrNull() ?: return@transaction null
+        val row = UsersT.selectAll().where { UsersT.username eq username }.singleOrNull() ?: return@transaction null
         val userId = row[UsersT.id]
         val roles = (UserRolesT innerJoin RolesT)
-            .select { UserRolesT.userId eq userId }
+            .selectAll().where { UserRolesT.userId eq userId }
             .map { it[RolesT.name] }
         AuthUser(
             id = userId.toString(),
@@ -105,7 +105,7 @@ object AuthRepository {
     fun validateRefreshToken(raw: String): AuthUser? {
         val hash = sha256(raw)
         return transaction {
-            val row = RefreshTokensT.select { RefreshTokensT.tokenHash eq hash }.singleOrNull() ?: return@transaction null
+            val row = RefreshTokensT.selectAll().where { RefreshTokensT.tokenHash eq hash }.singleOrNull() ?: return@transaction null
             if (row[RefreshTokensT.revokedAt] != null) return@transaction null
             if (row[RefreshTokensT.expiresAt].isBefore(Instant.now())) return@transaction null
             findUserById(row[RefreshTokensT.userId].toString())
@@ -122,9 +122,9 @@ object AuthRepository {
     }
 
     private fun findUserById(id: String): AuthUser? = transaction {
-        val row = UsersT.select { UsersT.id eq UUID.fromString(id) }.singleOrNull() ?: return@transaction null
+        val row = UsersT.selectAll().where { UsersT.id eq UUID.fromString(id) }.singleOrNull() ?: return@transaction null
         val roles = (UserRolesT innerJoin RolesT)
-            .select { UserRolesT.userId eq UUID.fromString(id) }
+            .selectAll().where { UserRolesT.userId eq UUID.fromString(id) }
             .map { it[RolesT.name] }
         AuthUser(
             id = row[UsersT.id].toString(),

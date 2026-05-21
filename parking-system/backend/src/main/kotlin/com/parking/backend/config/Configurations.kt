@@ -1,6 +1,11 @@
 package com.parking.backend.config
 
+import io.ktor.server.application.Application
+import io.ktor.server.application.install
 import io.ktor.server.config.ApplicationConfig
+import org.koin.dsl.module
+import org.koin.ktor.plugin.Koin
+import org.koin.logger.slf4jLogger
 
 /**
  * Configuración tipada construida a partir de `application.conf`.
@@ -88,11 +93,11 @@ data class CorsConfig(val allowedHosts: List<String>)
  * Configuración del módulo Koin para el backend.  Registra el AppConfig y
  * cualquier servicio singleton que se necesite (DI mínima — no se abusa).
  */
-fun io.ktor.server.application.Application.configureKoin(cfg: AppConfig) {
-    install(org.koin.ktor.plugin.Koin) {
-        org.koin.logger.slf4jLogger()
+fun Application.configureKoin(cfg: AppConfig) {
+    install(Koin) {
+        slf4jLogger()
         modules(
-            org.koin.dsl.module {
+            module {
                 single { cfg }
                 single { cfg.database }
                 single { cfg.security }

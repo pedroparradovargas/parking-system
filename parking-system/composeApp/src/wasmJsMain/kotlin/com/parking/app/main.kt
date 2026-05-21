@@ -17,5 +17,8 @@ import kotlinx.browser.document
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() {
     Napier.base(DebugAntilog())
-    ComposeViewport(document.body!!) { App() }
+    // Montar sobre el div #root del index.html — body default tiene margin:8px y altura auto,
+    // lo que hace que el viewport quede mal dimensionado y el contenido se salga del visible.
+    val mount = document.getElementById("root") ?: document.body!!
+    ComposeViewport(mount) { App() }
 }

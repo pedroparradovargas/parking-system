@@ -6,6 +6,20 @@
     <meta name="theme-color" content="#0F3D5C" />
     <link rel="manifest" href="manifest.json" />
     <title>Parking System</title>
+    <style>
+        /* Reset para que Compose ocupe exactamente la ventana sin overflow del body. */
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+        }
+        #root {
+            height: 100%;
+            width: 100%;
+        }
+    </style>
 </head>
 <body>
     <div id="root"></div>

@@ -3,12 +3,13 @@ package com.parking.backend.routes
 import com.parking.shared.data.api.dto.SessionDto
 import com.parking.shared.domain.model.SessionStatus
 import com.parking.shared.domain.model.VehicleType
-import org.jetbrains.exposed.sql.Table
+import org.jetbrains.exposed.sql.SqlExpressionBuilder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.javatime.timestamp
-import org.jetbrains.exposed.sql.select
+import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
 import java.time.Instant
@@ -63,7 +64,7 @@ object SessionRepository {
         }
         body.zoneId?.let { zone ->
             ZonesT.update({ ZonesT.id eq UUID.fromString(zone) }) {
-                it[currentOccupancy] = currentOccupancy + 1
+                with(SqlExpressionBuilder) { it[currentOccupancy] = currentOccupancy + 1 }
             }
         }
         body.copy(id = sessionId.toString(), status = SessionStatus.ACTIVE)
@@ -78,10 +79,12 @@ object SessionRepository {
             it[ParkingSessionsT.totalCents] = totalCents
             it[ParkingSessionsT.ivaCents] = ivaCents
         }
-        val row = ParkingSessionsT.select { ParkingSessionsT.id eq sUuid }.single()
+        val row = ParkingSessionsT.selectAll().where { ParkingSessionsT.id eq sUuid }.single()
         val zoneId = row[ParkingSessionsT.zoneId]
         if (zoneId != null) {
-            ZonesT.update({ ZonesT.id eq zoneId }) { it[currentOccupancy] = currentOccupancy - 1 }
+            ZonesT.update({ ZonesT.id eq zoneId }) {
+                with(SqlExpressionBuilder) { it[currentOccupancy] = currentOccupancy - 1 }
+            }
         }
         SessionDto(
             id = sessionId,
@@ -101,7 +104,7 @@ object SessionRepository {
     }
 
     fun activeSessions(parkingId: String): List<SessionDto> = transaction {
-        ParkingSessionsT.select {
+        ParkingSessionsT.selectAll().where {
             ParkingSessionsT.parkingId eq UUID.fromString(parkingId) and
                 (ParkingSessionsT.status eq SessionStatus.ACTIVE.name)
         }.map { row ->
@@ -124,7 +127,7 @@ object SessionRepository {
     }
 
     fun zoneOccupancy(zoneId: String): ZoneOccupancySnapshot = transaction {
-        val row = ZonesT.select { ZonesT.id eq UUID.fromString(zoneId) }.single()
+        val row = ZonesT.selectAll().where { ZonesT.id eq UUID.fromString(zoneId) }.single()
         ZoneOccupancySnapshot(row[ZonesT.code], row[ZonesT.capacity], row[ZonesT.currentOccupancy])
     }
 }
