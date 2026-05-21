@@ -108,9 +108,27 @@ class LocalRepository(private val db: ParkingDatabase) {
             .asFlow().mapToList(Dispatchers.Default)
             .map { rows -> rows.map { it.toDomainSession() } }
 
+    /** Sesiones cerradas con `exit_at_ms >= sinceMs` para el dashboard "cerrados hoy". */
+    fun watchClosedSessionsSince(parkingId: String, sinceMs: Long): Flow<List<ParkingSession>> =
+        db.sessionsQueries.selectClosedSince(parkingId, sinceMs)
+            .asFlow().mapToList(Dispatchers.Default)
+            .map { rows -> rows.map { it.toDomainSession() } }
+
     suspend fun findActiveByPlate(parkingId: String, plate: PlateNumber): ParkingSession? =
         db.sessionsQueries.selectActiveByPlate(parkingId, plate.normalized())
             .executeAsOneOrNull()?.toDomainSession()
+
+    /** Suma `delta` (puede ser negativo) al `current_occupancy` de la zona. */
+    suspend fun incrementZoneOccupancy(zoneId: String, delta: Int) {
+        db.zonesQueries.incrementOccupancy(delta = delta.toLong(), id = zoneId)
+    }
+
+    /** Cuenta filas para decidir si sembrar la DB en el primer arranque. */
+    suspend fun countZones(parkingId: String): Long =
+        db.zonesQueries.countZones(parkingId).executeAsOne()
+
+    suspend fun countSessions(parkingId: String): Long =
+        db.sessionsQueries.countSessions(parkingId).executeAsOne()
 
     // ---- Recibos (outbox) ----
     suspend fun insertReceipt(r: Receipt) {

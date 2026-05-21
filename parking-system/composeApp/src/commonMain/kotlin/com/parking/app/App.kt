@@ -2,16 +2,22 @@ package com.parking.app
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import com.parking.app.navigation.AppNav
 import com.parking.app.navigation.Screen
 import com.parking.app.state.AppState
 import com.parking.app.state.LocalAppState
+import com.parking.app.state.MockData
+import com.parking.app.state.seedDatabaseIfEmpty
 import com.parking.app.ui.shell.AppShell
 import com.parking.app.ui.theme.ParkingTheme
+import com.parking.shared.data.local.LocalRepository
+import org.koin.compose.koinInject
 
 /**
  * Composable raíz consumido por TODAS las plataformas.
@@ -19,10 +25,27 @@ import com.parking.app.ui.theme.ParkingTheme
  *  - El mockup Figma no tiene pantalla de login: el rol se cambia desde el header.
  *  - La pantalla inicial es [Screen.MainMenu].
  *  - Todo el contenido vive dentro del [AppShell] (header + tab nav).
+ *  - [AppState] se construye con el [LocalRepository] inyectado vía Koin
+ *    (Regla 9: offline-first sobre SQLDelight, no in-memory).
  */
 @Composable
 fun App() {
-    val appState = remember { AppState() }
+    val repo: LocalRepository = koinInject()
+    val scope = rememberCoroutineScope()
+    val appState = remember {
+        AppState(
+            repo = repo,
+            scope = scope,
+            parkingId = MockData.PARKING_ID,
+            parkingName = MockData.PARKING_NAME,
+        )
+    }
+
+    // Siembra DB en el primer arranque (zonas y sesiones vacías → carga demo).
+    LaunchedEffect(repo, appState.parkingId) {
+        seedDatabaseIfEmpty(repo, appState.parkingId)
+    }
+
     var current by remember { mutableStateOf<Screen>(Screen.MainMenu) }
 
     CompositionLocalProvider(LocalAppState provides appState) {

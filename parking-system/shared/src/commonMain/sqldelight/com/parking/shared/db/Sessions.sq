@@ -25,6 +25,16 @@ selectActiveByPlate:
 SELECT * FROM sessions WHERE parking_id = ? AND plate = ? AND status = 'ACTIVE'
 LIMIT 1;
 
+-- Sesiones cerradas en el rango [since, now).  Usada por el dashboard
+-- para alimentar "cerrados hoy".
+selectClosedSince:
+SELECT * FROM sessions
+WHERE parking_id = ? AND status = 'CLOSED' AND exit_at_ms >= ?
+ORDER BY exit_at_ms DESC;
+
+countSessions:
+SELECT COUNT(*) FROM sessions WHERE parking_id = ?;
+
 insert:
 INSERT INTO sessions(id, parking_id, plate, vehicle_type, zone_id, entry_at_ms, exit_at_ms,
     status, customer_id, operator_user_id, entry_gate)

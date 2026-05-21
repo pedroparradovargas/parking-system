@@ -14,6 +14,9 @@ CREATE INDEX IF NOT EXISTS idx_zones_parking ON zones(parking_id);
 selectByParking:
 SELECT * FROM zones WHERE parking_id = ?;
 
+countZones:
+SELECT COUNT(*) FROM zones WHERE parking_id = ?;
+
 incrementOccupancy:
 UPDATE zones SET current_occupancy = current_occupancy + :delta WHERE id = :id;
 

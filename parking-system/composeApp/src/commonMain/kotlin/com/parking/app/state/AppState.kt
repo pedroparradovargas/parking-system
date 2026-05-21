@@ -1,11 +1,11 @@
 package com.parking.app.state
 
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshots.SnapshotStateList
+import com.parking.shared.data.local.LocalRepository
 import com.parking.shared.domain.model.ChargeBreakdown
 import com.parking.shared.domain.model.ParkingSession
 import com.parking.shared.domain.model.PlateNumber
@@ -14,23 +14,43 @@ import com.parking.shared.domain.model.Tariff
 import com.parking.shared.domain.model.VehicleType
 import com.parking.shared.domain.model.Zone
 import com.parking.shared.domain.tariff.TariffCalculator
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toInstant
+import kotlinx.datetime.toLocalDateTime
 
 /**
- * Estado global mínimo de la UI — fuente única de verdad para sesiones activas,
- * zonas y tarifa demo mientras el repositorio real (LocalRepository + SyncManager)
- * no está cableado en la UI.
+ * Estado global de la UI — ahora respaldado por SQLDelight vía [LocalRepository]
+ * (Regla 9: offline-first).  La UI consume las listas como State observables;
+ * cada escritura dispara una corutina en [scope] que persiste y los Flow
+ * actualizan el State automáticamente.
  *
- * Cumple Regla 7 (tariff calc vía shared.TariffCalculator) y Regla 9 (offline-first:
- * todo opera en memoria sin requerir backend).  Cuando se conecte el repo real,
- * los métodos `registerEntry`/`closeSession` se delegan a [com.parking.shared.data.local.LocalRepository].
+ * Convención: los métodos de mutación retornan un valor calculado al vuelo
+ * (sesión recién creada, breakdown del cobro) y persisten en background.
+ * La latencia de SQLite local es < 5 ms, así que la UI ve el cambio en el
+ * siguiente frame.
  */
-class AppState {
+class AppState(
+    private val repo: LocalRepository,
+    private val scope: CoroutineScope,
+    val parkingId: String,
+    val parkingName: String,
+) {
+    /** Tarifa demo de fallback hasta que la DB emita la real (en práctica el Seeder garantiza una). */
+    private var demoTariff: Tariff = MockData.demoTariff(parkingId)
 
-    /** Identificador del parqueadero actual.  En multi-tenant viene del JWT (Regla 4). */
-    val parkingId: String = MockData.PARKING_ID
-    val parkingName: String = MockData.PARKING_NAME
+    /** Tarifa vigente observada en SQLDelight. Si llega vacía, usamos `demoTariff`. */
+    private val tariffsFlow: StateFlow<List<Tariff>> = repo.watchTariffs(parkingId)
+        .stateIn(scope, SharingStarted.Eagerly, listOf(demoTariff))
 
     /** Usuario logueado.  En la versión real viene de AuthRepository. */
     var loggedInUser: String? by mutableStateOfDelegate(null)
@@ -41,28 +61,68 @@ class AppState {
     /** Estado de red simulado para probar el OfflineBanner. */
     var isOnline: Boolean by mutableStateOfDelegate(true)
 
-    /** Sesiones activas en memoria (lista observable por Compose). */
-    val activeSessions: SnapshotStateList<ParkingSession> = mutableStateListOf<ParkingSession>().apply {
-        addAll(MockData.seedActiveSessions())
+    /** Bandera de modo oscuro. */
+    var darkTheme: Boolean by mutableStateOfDelegate(false)
+
+    /** Sesiones activas observadas desde la DB. */
+    private val _activeSessions: MutableState<List<ParkingSession>> = mutableStateOf(emptyList())
+    val activeSessions: List<ParkingSession> get() = _activeSessions.value
+
+    /** Zonas observadas desde la DB. */
+    private val _zones: MutableState<List<Zone>> = mutableStateOf(emptyList())
+    val zones: List<Zone> get() = _zones.value
+
+    /** Histórico cerrado del día actual + breakdown calculado al vuelo. */
+    private val _closedToday: MutableState<List<ClosedSessionEntry>> = mutableStateOf(emptyList())
+    val closedToday: List<ClosedSessionEntry> get() = _closedToday.value
+
+    init {
+        // Suscripción a Flows del repo — actualizan State observables de Compose.
+        scope.launch {
+            repo.watchActiveSessions(parkingId).collect { list ->
+                _activeSessions.value = list
+            }
+        }
+        scope.launch {
+            repo.watchZones(parkingId).collect { list ->
+                _zones.value = list
+            }
+        }
+        scope.launch {
+            tariffsFlow.collect { list ->
+                if (list.isNotEmpty()) demoTariff = list.first()
+            }
+        }
+        scope.launch {
+            // "Cerrados hoy" = sesiones con exit_at_ms >= inicio del día local.
+            val tz = runCatching { TimeZone.currentSystemDefault() }.getOrDefault(TimeZone.UTC)
+            val startOfDay = startOfTodayMillis(tz)
+            // Combinamos sesiones cerradas con la tarifa vigente para calcular breakdowns.
+            repo.watchClosedSessionsSince(parkingId, startOfDay)
+                .combine(tariffsFlow) { sessions, tariffs ->
+                    val tariff = tariffs.firstOrNull() ?: demoTariff
+                    sessions.mapNotNull { s ->
+                        val exit = s.exitAt ?: return@mapNotNull null
+                        val breakdown = TariffCalculator.calculate(
+                            tariff = tariff,
+                            entryAt = s.entryAt,
+                            exitAt = exit,
+                            timeZone = tz,
+                        )
+                        ClosedSessionEntry(s, breakdown)
+                    }
+                }
+                .collect { _closedToday.value = it }
+        }
     }
 
-    /** Histórico cerrado del día para alimentar Dashboard. */
-    val closedToday: SnapshotStateList<ClosedSessionEntry> = mutableStateListOf<ClosedSessionEntry>().apply {
-        addAll(MockData.seedClosedToday())
-    }
-
-    /** Zonas con ocupación viva (ZonesScreen + Cashier indicator). */
-    val zones: SnapshotStateList<Zone> = mutableStateListOf<Zone>().apply {
-        addAll(MockData.seedZones(parkingId))
-    }
-
-    /** Tarifa demo única — en producción viene de TariffsRepository por tipo. */
-    private val demoTariff: Tariff = MockData.demoTariff(parkingId)
-
-    /** Resuelve la tarifa aplicable para un tipo (placeholder hasta cablear repo). */
+    /** Resuelve la tarifa aplicable para un tipo (placeholder hasta repo por tipo). */
     fun tariffFor(@Suppress("UNUSED_PARAMETER") type: VehicleType): Tariff = demoTariff
 
-    /** Registra entrada de un vehículo y crea sesión ACTIVA. */
+    /**
+     * Registra entrada y persiste en SQLite en background.  El Flow `watchActiveSessions`
+     * refrescará la lista en el siguiente frame de Compose.
+     */
     fun registerEntry(plate: PlateNumber, type: VehicleType, zoneCode: String? = null): ParkingSession {
         val zone = zoneCode?.let { code -> zones.firstOrNull { it.code == code } }
         val session = ParkingSession(
@@ -74,15 +134,14 @@ class AppState {
             entryAt = Clock.System.now(),
             status = SessionStatus.ACTIVE,
         )
-        activeSessions.add(0, session)
-        if (zone != null) {
-            val idx = zones.indexOf(zone)
-            zones[idx] = zone.copy(currentOccupancy = zone.currentOccupancy + 1)
+        scope.launch {
+            repo.insertSession(session)
+            zone?.id?.let { repo.incrementZoneOccupancy(it, +1) }
         }
         return session
     }
 
-    /** Busca una sesión activa por placa (normalizada). */
+    /** Busca una sesión activa por placa (en memoria — el Flow mantiene la lista al día). */
     fun findActiveByPlate(query: String): ParkingSession? {
         val q = query.uppercase().trim()
         return activeSessions.firstOrNull { it.plate.normalized() == q }
@@ -96,22 +155,19 @@ class AppState {
             exitAt = exitAt,
         )
 
-    /** Cierra la sesión, registra el cobro y libera el cupo en la zona. */
+    /**
+     * Cierra la sesión: calcula breakdown sincrónicamente (para devolver a la UI),
+     * y persiste el cierre + decremento de zona en background.
+     */
     fun closeSession(session: ParkingSession): ChargeBreakdown {
         val exit = Clock.System.now()
         val breakdown = previewCharge(session, exit)
-        activeSessions.removeAll { it.id == session.id }
-        closedToday.add(0, ClosedSessionEntry(session.copy(exitAt = exit, status = SessionStatus.CLOSED), breakdown))
-        session.zoneId?.let { zid ->
-            val zone = zones.firstOrNull { it.id == zid } ?: return@let
-            val idx = zones.indexOf(zone)
-            zones[idx] = zone.copy(currentOccupancy = (zone.currentOccupancy - 1).coerceAtLeast(0))
+        scope.launch {
+            repo.closeSession(session.id, exit)
+            session.zoneId?.let { repo.incrementZoneOccupancy(it, -1) }
         }
         return breakdown
     }
-
-    /** Bandera de modo oscuro (no persistido — sería preferencia local). */
-    var darkTheme: Boolean by mutableStateOfDelegate(false)
 }
 
 /** Entrada del histórico cerrado del día — Sesión + breakdown del cobro. */
@@ -142,6 +198,13 @@ internal fun generateLocalId(): String {
 /** Helper para usar `by` con `mutableStateOf` en propiedades de clase. */
 private fun <T> mutableStateOfDelegate(initial: T): androidx.compose.runtime.MutableState<T> =
     mutableStateOf(initial)
+
+/** Millis del inicio del día local (00:00:00 en la zona horaria del sistema). */
+private fun startOfTodayMillis(tz: TimeZone): Long {
+    val now = Clock.System.now().toLocalDateTime(tz)
+    val startLocal = LocalDateTime(now.year, now.month, now.dayOfMonth, 0, 0, 0, 0)
+    return startLocal.toInstant(tz).toEpochMilliseconds()
+}
 
 /** CompositionLocal raíz que expone el AppState a toda la jerarquía de UI. */
 val LocalAppState = compositionLocalOf<AppState> {
