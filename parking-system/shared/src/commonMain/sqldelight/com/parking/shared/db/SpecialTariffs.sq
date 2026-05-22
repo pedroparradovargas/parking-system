@@ -1,0 +1,39 @@
+-- Tarifas especiales (multiplicadores) sincronizadas para cálculo offline.
+-- rule_type: WEEKEND | HOLIDAY | DATE_RANGE | DAY_OF_WEEK.
+
+CREATE TABLE IF NOT EXISTS special_tariffs (
+    id                  TEXT NOT NULL PRIMARY KEY,
+    parking_id          TEXT NOT NULL,
+    name                TEXT NOT NULL,
+    rule_type           TEXT NOT NULL,
+    -- multiplicador se persiste como REAL en SQLite — suficiente precisión
+    -- (NUMERIC(4,2) del backend, p.ej. 1.20).
+    multiplier          REAL NOT NULL,
+    date_from_iso       TEXT,
+    date_to_iso         TEXT,
+    day_of_week_csv     TEXT,
+    enabled             INTEGER NOT NULL DEFAULT 1,
+    created_at_ms       INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_special_tariffs_parking ON special_tariffs(parking_id, enabled);
+
+selectByParking:
+SELECT * FROM special_tariffs WHERE parking_id = ?
+ORDER BY name ASC;
+
+upsert:
+INSERT INTO special_tariffs(id, parking_id, name, rule_type, multiplier, date_from_iso, date_to_iso, day_of_week_csv, enabled, created_at_ms)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(id) DO UPDATE SET
+    name             = excluded.name,
+    rule_type        = excluded.rule_type,
+    multiplier       = excluded.multiplier,
+    date_from_iso    = excluded.date_from_iso,
+    date_to_iso      = excluded.date_to_iso,
+    day_of_week_csv  = excluded.day_of_week_csv,
+    enabled          = excluded.enabled,
+    created_at_ms    = excluded.created_at_ms;
+
+deleteById:
+DELETE FROM special_tariffs WHERE id = ?;

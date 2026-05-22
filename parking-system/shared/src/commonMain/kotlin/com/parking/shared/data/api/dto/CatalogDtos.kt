@@ -27,4 +27,22 @@ data class ZoneDto(
     val capacity: Int,
     val currentOccupancy: Int,
     val allowedVehicleTypes: List<VehicleType>,
+    // V2 — extensiones del módulo Admin.  Defaults a 0/true/0/null para que
+    // la deserialización siga funcionando con respuestas legacy.
+    val underMaintenance: Int = 0,
+    val enabled: Boolean = true,
+    val displayOrder: Int = 0,
+    val notes: String? = null,
+)
+
+/** Body para crear/editar una zona desde el módulo Admin. */
+@Serializable
+data class UpsertZoneRequest(
+    val code: String,
+    val capacity: Int,
+    val allowedVehicleTypes: List<VehicleType>,
+    val underMaintenance: Int = 0,
+    val enabled: Boolean = true,
+    val displayOrder: Int = 0,
+    val notes: String? = null,
 )

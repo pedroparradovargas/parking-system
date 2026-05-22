@@ -1,6 +1,15 @@
 # Auditoría e Inventario de Código
 
-**Fecha:** 2026-05-21.
+**Fecha original:** 2026-05-21. **Actualizado:** 2026-05-22 (Fases A + B + C completas).
+
+> **Cambios desde la auditoría inicial** (resumen rápido — detalle en `project_parking_system_rules.md`):
+> - Fase A — LocalRepository cableado a AppState; AuditRepository con hash chain; archivos partidos < 300; openapi validado; 4 tests AuditRepository.
+> - Fase B — CRUD Tarifas + Planes + Especiales + Holidays end-to-end; 8 tests AdminTariff.
+> - Fase C — CRUD Zonas end-to-end; 8 tests AdminZone.
+> - Consolidación — UI Planes/Especiales completa; SQLDelight local para los 3 catálogos admin; openapi extendido; 20 tests backend pasan.
+>
+> **Total tests backend al 2026-05-22**: 20 (4 + 8 + 8). Antes era 1 (TariffCalculator).
+
 **Alcance:** todos los módulos bajo `parking-system/` (shared, composeApp, backend, ai-service, web-admin).
 **Metodología:** lectura directa de archivos + grep cruzados para detectar referencias.
 
@@ -166,26 +175,35 @@
 
 ## 4. Deudas técnicas detectadas
 
-### 4.1 Reglas del proyecto violadas
+### 4.1 Reglas del proyecto — estado actualizado (2026-05-22)
 
-| Regla | Violación | Donde |
-|-------|----------|-------|
-| **3** (archivos < 300 líneas) | `CashierScreen.kt` 405 líneas | composeApp |
-| **3** | `DashboardScreen.kt` 462 líneas | composeApp |
-| **3** | `TariffManagementScreen.kt` 405 líneas (estimación) | composeApp |
-| **6** (auditoría con hash chain) | Tabla `audit_log` definida pero NO se inserta ningún registro | backend |
-| **13** (modo degradado IA) | No hay timeout ni circuit breaker en cliente para ai-service (porque nadie lo invoca aún) | shared + backend |
-| **9** (offline-first cliente) | `LocalRepository` y `SyncManager` existen pero la UI usa `MockData` en memoria — no estás siendo offline-first todavía | composeApp |
+| Regla | Estado original (2026-05-21) | Estado actual (2026-05-22) |
+|-------|----|----|
+| **3** (archivos < 300 líneas) | ❌ CashierScreen 405, DashboardScreen 462, TariffManagementScreen 405 | ✅ los 3 partidos en archivos < 300 (Fase A.3) |
+| **6** (audit hash chain) | ❌ tabla definida pero sin inserts | ✅ `AuditRepository.append()` con SHA-256 monotónico ms-truncado; integrado en login/refresh/session-opened/session-closed + 19 mutaciones admin (tariff/plan/special/holiday/zone) |
+| **9** (offline-first cliente) | ❌ MockData en memoria | ✅ AppState consume Flow de SQLDelight via Koin; Seeder siembra DB en primer arranque; SyncManager.pull persiste tariff_plans + special_tariffs + holidays localmente |
+| **13** (modo degradado IA) | ❌ ai-service sin integrar | ⚠ sigue pendiente (no requerido por Fases A-C) |
 
-### 4.2 Otros gaps de calidad
+### 4.2 Otros gaps de calidad — estado actualizado
 
-- **Tests** muy bajos: solo `TariffCalculatorTest` (commonTest) y smoke del ai-service. **Cero tests** en backend, composeApp, web-admin.
-- **OpenAPI** (`docs/api/openapi.yaml`) existe pero **no se ha validado** que refleje los endpoints actuales del backend.
-- **No hay logging estructurado** (logback usa formato default).
-- **Sin métricas/observabilidad**: cero Prometheus, cero OpenTelemetry, cero healthchecks consumidos por orquestador.
-- **No hay CI** activo: hay `.github/workflows/` mencionado en estructura pero no auditamos su contenido.
-- **Periféricos** (ThermalPrinter, BarcodeScanner, CashDrawer) **están implementados pero no integrados a UI**. La caja imprime nada todavía.
-- **AppState es in-memory** — toda la "operación" actual es simulada con `MockData`. La integración shared `LocalRepository` → `AppState` está pendiente.
+- **Tests backend** ✅ ahora 20 (4 AuditRepository + 8 AdminTariff + 8 AdminZone). Antes era 1.
+- **Tests composeApp / web-admin** ❌ siguen en cero.
+- **OpenAPI** ✅ extendido con 19 endpoints admin nuevos + schemas DTOs (Consolidación 1).
+- **Logging estructurado** ❌ pendiente.
+- **Métricas/observabilidad** ❌ pendiente.
+- **CI/CD** ⚠ no verificado.
+- **Periféricos** ⚠ implementados, sigue sin integración a UI (no requerido por Fases A-C).
+- **AppState in-memory** ✅ ya consume Flow del LocalRepository real (Fase A.1).
+
+### 4.3 Deudas vivas tras consolidación
+
+- UI de `Customers` (clientes con mensualidades) — pendiente Fase E.
+- UI de `Users` (operadores) — pendiente Fase D.
+- Reportes con filtros + export — pendiente Fase F.
+- Configuración del parqueadero (datos fiscales) — pendiente Fase G.
+- Consulta de audit_log en UI — pendiente Fase G.
+- Periféricos UI — pendiente Fase H.
+- Modelo de dominio "limpio" para `TariffPlan` / `SpecialTariff` / `Holiday` (hoy persisten como DTOs en `LocalRepository` — viola tácticamente Regla 2). Refactor opcional.
 
 ---
 

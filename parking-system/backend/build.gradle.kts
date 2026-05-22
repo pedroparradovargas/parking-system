@@ -48,8 +48,12 @@ dependencies {
     testImplementation(libs.ktor.server.test)
     testImplementation(libs.kotest.runner.junit5)
     testImplementation(libs.kotest.assertions)
+    testImplementation("com.h2database:h2:2.2.224")
 }
 
 tasks.test {
     useJUnitPlatform()
+    // Las suites de tests usan H2 in-memory compartido entre JVMs.  Ejecutar
+    // en serie evita que dos clases pisen el mismo schema.
+    maxParallelForks = 1
 }

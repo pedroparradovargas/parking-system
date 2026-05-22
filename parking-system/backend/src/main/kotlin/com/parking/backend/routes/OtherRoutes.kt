@@ -25,19 +25,9 @@ fun Application.registerOtherRoutes() {
 
             route("/api/v1/parkings/{parkingId}") {
 
-                get("/tariffs") {
-                    val principal = call.principal<JWTPrincipal>()!!
-                    val parkingId = call.parameters["parkingId"]!!
-                    requireSameTenant(principal, parkingId)
-                    call.respond(SyncRepository.tariffsSince(parkingId, 0L))
-                }
-
-                get("/zones") {
-                    val principal = call.principal<JWTPrincipal>()!!
-                    val parkingId = call.parameters["parkingId"]!!
-                    requireSameTenant(principal, parkingId)
-                    call.respond(SyncRepository.zonesSnapshot(parkingId))
-                }
+                // GET /tariffs ahora lo provee `AdminTariffRoutes` (default = vigentes;
+                // `?historic=true` para histórico completo).
+                // GET /zones ahora lo provee `AdminZoneRoutes` (devuelve campos V2).
 
                 route("/reports") {
 

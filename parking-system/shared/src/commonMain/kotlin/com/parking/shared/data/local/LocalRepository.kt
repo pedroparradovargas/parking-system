@@ -2,6 +2,10 @@ package com.parking.shared.data.local
 
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
+import com.parking.shared.data.api.dto.HolidayDto
+import com.parking.shared.data.api.dto.SpecialTariffDto
+import com.parking.shared.data.api.dto.SpecialTariffRule
+import com.parking.shared.data.api.dto.TariffPlanDto
 import com.parking.shared.db.ParkingDatabase
 import com.parking.shared.domain.model.Customer
 import com.parking.shared.domain.model.ParkingSession
@@ -182,6 +186,86 @@ class LocalRepository(private val db: ParkingDatabase) {
         db.customersQueries.selectByDocument(parkingId, document)
             .executeAsOneOrNull()?.toDomain()
 
+    // ---- Admin: Planes de mensualidad (cache desde backend) ----
+    fun watchTariffPlans(parkingId: String): Flow<List<TariffPlanDto>> =
+        db.tariffPlansQueries.selectByParking(parkingId)
+            .asFlow().mapToList(Dispatchers.Default)
+            .map { rows -> rows.map { it.toPlanDto() } }
+
+    suspend fun upsertTariffPlans(plans: List<TariffPlanDto>) {
+        db.transaction {
+            plans.forEach { p ->
+                db.tariffPlansQueries.upsert(
+                    id = p.id,
+                    parking_id = p.parkingId,
+                    name = p.name,
+                    duration_days = p.durationDays.toLong(),
+                    price_cents = p.priceCents,
+                    vehicle_type = p.vehicleType.name,
+                    enabled = if (p.enabled) 1L else 0L,
+                    created_at_ms = p.createdAtMillis,
+                )
+            }
+        }
+    }
+
+    suspend fun deleteTariffPlan(id: String) {
+        db.tariffPlansQueries.deleteById(id)
+    }
+
+    // ---- Admin: Tarifas especiales (cache desde backend) ----
+    fun watchSpecialTariffs(parkingId: String): Flow<List<SpecialTariffDto>> =
+        db.specialTariffsQueries.selectByParking(parkingId)
+            .asFlow().mapToList(Dispatchers.Default)
+            .map { rows -> rows.map { it.toSpecialDto() } }
+
+    suspend fun upsertSpecialTariffs(specials: List<SpecialTariffDto>) {
+        db.transaction {
+            specials.forEach { s ->
+                db.specialTariffsQueries.upsert(
+                    id = s.id,
+                    parking_id = s.parkingId,
+                    name = s.name,
+                    rule_type = s.ruleType.name,
+                    multiplier = s.multiplier,
+                    date_from_iso = s.dateFromIso,
+                    date_to_iso = s.dateToIso,
+                    day_of_week_csv = s.dayOfWeekCsv,
+                    enabled = if (s.enabled) 1L else 0L,
+                    created_at_ms = s.createdAtMillis,
+                )
+            }
+        }
+    }
+
+    suspend fun deleteSpecialTariff(id: String) {
+        db.specialTariffsQueries.deleteById(id)
+    }
+
+    // ---- Admin: Festivos (cache desde backend) ----
+    fun watchHolidays(parkingId: String): Flow<List<HolidayDto>> =
+        db.holidaysQueries.selectByParking(parkingId)
+            .asFlow().mapToList(Dispatchers.Default)
+            .map { rows -> rows.map { it.toHolidayDto() } }
+
+    suspend fun upsertHolidays(holidays: List<HolidayDto>) {
+        db.transaction {
+            holidays.forEach { h ->
+                db.holidaysQueries.upsert(
+                    id = h.id,
+                    parking_id = h.parkingId,
+                    date_iso = h.dateIso,
+                    name = h.name,
+                    created_at_ms = h.createdAtMillis,
+                )
+            }
+        }
+    }
+
+    suspend fun deleteHoliday(id: String) {
+        db.holidaysQueries.deleteById(id)
+    }
+
     // ---- Auditoría ----
     suspend fun appendAuditLog(action: String, entity: String, entityId: String, payload: String, previousHash: String?): String {
         val now = Clock.System.now().toEpochMilliseconds()
@@ -258,6 +342,38 @@ private fun com.parking.shared.db.Receipts.toDomain(): Receipt = Receipt(
     cufe = cufe,
     syncStatus = ReceiptSyncStatus.valueOf(sync_status),
     serverId = server_id,
+)
+
+private fun com.parking.shared.db.Tariff_plans.toPlanDto(): TariffPlanDto = TariffPlanDto(
+    id = id,
+    parkingId = parking_id,
+    name = name,
+    durationDays = duration_days.toInt(),
+    priceCents = price_cents,
+    vehicleType = VehicleType.valueOf(vehicle_type),
+    enabled = enabled == 1L,
+    createdAtMillis = created_at_ms,
+)
+
+private fun com.parking.shared.db.Special_tariffs.toSpecialDto(): SpecialTariffDto = SpecialTariffDto(
+    id = id,
+    parkingId = parking_id,
+    name = name,
+    ruleType = SpecialTariffRule.valueOf(rule_type),
+    multiplier = multiplier,
+    dateFromIso = date_from_iso,
+    dateToIso = date_to_iso,
+    dayOfWeekCsv = day_of_week_csv,
+    enabled = enabled == 1L,
+    createdAtMillis = created_at_ms,
+)
+
+private fun com.parking.shared.db.Holidays.toHolidayDto(): HolidayDto = HolidayDto(
+    id = id,
+    parkingId = parking_id,
+    dateIso = date_iso,
+    name = name,
+    createdAtMillis = created_at_ms,
 )
 
 private fun com.parking.shared.db.Customers.toDomain(): Customer = Customer(

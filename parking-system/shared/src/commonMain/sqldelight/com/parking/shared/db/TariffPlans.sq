@@ -1,0 +1,33 @@
+-- Planes de mensualidad sincronizados desde el backend para uso offline.
+-- Se persisten como cache local; el origen autoritativo sigue siendo PostgreSQL.
+
+CREATE TABLE IF NOT EXISTS tariff_plans (
+    id              TEXT NOT NULL PRIMARY KEY,
+    parking_id      TEXT NOT NULL,
+    name            TEXT NOT NULL,
+    duration_days   INTEGER NOT NULL,
+    price_cents     INTEGER NOT NULL,
+    vehicle_type    TEXT NOT NULL,
+    enabled         INTEGER NOT NULL DEFAULT 1,
+    created_at_ms   INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_tariff_plans_parking ON tariff_plans(parking_id, enabled);
+
+selectByParking:
+SELECT * FROM tariff_plans WHERE parking_id = ?
+ORDER BY duration_days ASC;
+
+upsert:
+INSERT INTO tariff_plans(id, parking_id, name, duration_days, price_cents, vehicle_type, enabled, created_at_ms)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(id) DO UPDATE SET
+    name          = excluded.name,
+    duration_days = excluded.duration_days,
+    price_cents   = excluded.price_cents,
+    vehicle_type  = excluded.vehicle_type,
+    enabled       = excluded.enabled,
+    created_at_ms = excluded.created_at_ms;
+
+deleteById:
+DELETE FROM tariff_plans WHERE id = ?;

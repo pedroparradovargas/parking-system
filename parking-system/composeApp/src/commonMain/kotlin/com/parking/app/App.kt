@@ -11,12 +11,16 @@ import androidx.compose.runtime.setValue
 import com.parking.app.navigation.AppNav
 import com.parking.app.navigation.Screen
 import com.parking.app.state.AppState
+import com.parking.app.state.AuthTokenHolder
 import com.parking.app.state.LocalAppState
 import com.parking.app.state.MockData
 import com.parking.app.state.seedDatabaseIfEmpty
 import com.parking.app.ui.shell.AppShell
 import com.parking.app.ui.theme.ParkingTheme
+import com.parking.shared.data.api.ParkingApiClient
+import com.parking.shared.data.api.dto.LoginRequest
 import com.parking.shared.data.local.LocalRepository
+import io.github.aakira.napier.Napier
 import org.koin.compose.koinInject
 
 /**
@@ -31,6 +35,8 @@ import org.koin.compose.koinInject
 @Composable
 fun App() {
     val repo: LocalRepository = koinInject()
+    val api: ParkingApiClient = koinInject()
+    val tokens: AuthTokenHolder = koinInject()
     val scope = rememberCoroutineScope()
     val appState = remember {
         AppState(
@@ -44,6 +50,18 @@ fun App() {
     // Siembra DB en el primer arranque (zonas y sesiones vacías → carga demo).
     LaunchedEffect(repo, appState.parkingId) {
         seedDatabaseIfEmpty(repo, appState.parkingId)
+    }
+
+    // Auto-login dev: pobla AuthTokenHolder al arrancar para que las rutas
+    // admin no devuelvan 401.  En producción esto será una pantalla de Login.
+    LaunchedEffect(tokens) {
+        if (tokens.accessToken != null) return@LaunchedEffect
+        runCatching {
+            api.login(LoginRequest(username = "admin", password = "admin123"))
+        }.onSuccess { resp ->
+            tokens.set(resp.accessToken)
+            Napier.i("Auto-login OK como ${resp.user.username}")
+        }.onFailure { Napier.w("Auto-login fallo: ${it.message}") }
     }
 
     var current by remember { mutableStateOf<Screen>(Screen.MainMenu) }

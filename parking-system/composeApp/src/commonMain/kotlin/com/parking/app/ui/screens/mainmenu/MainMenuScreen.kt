@@ -180,9 +180,15 @@ private data class MenuOption(
 
 private fun optionsFor(role: UserRole): List<MenuOption> = when (role) {
     UserRole.Admin -> listOf(
-        MenuOption("Registro de Clientes", "Registrar nuevos clientes en el sistema.", Icons.Filled.PersonOutline, AccentPalette.Blue, Screen.ClientRegistration),
+        MenuOption("Gestión de Clientes", "Mensualistas, vehículos asociados, vencimientos.", Icons.Filled.PersonOutline, AccentPalette.Blue, Screen.AdminCustomers),
         MenuOption("Gestión de Tarifas", "Configurar precios y políticas.", Icons.Filled.Settings, AccentPalette.Green, Screen.TariffManagement),
+        MenuOption("Gestión de Zonas", "Crear, editar y configurar zonas.", Icons.Filled.Map, AccentPalette.Yellow, Screen.AdminZones),
+        MenuOption("Gestión de Usuarios", "Operadores, roles y 2FA.", Icons.Filled.Shield, AccentPalette.Red, Screen.AdminUsers),
         MenuOption("Reportes y Estadísticas", "Análisis de uso del parqueadero.", Icons.Filled.BarChart, AccentPalette.Purple, Screen.Reports),
+        MenuOption("Reportes administrativos", "Cierre de caja, top placas, mensualidades.", Icons.Filled.BarChart, AccentPalette.Green, Screen.AdminReports),
+        MenuOption("Configuración del parqueadero", "Datos fiscales, horarios, integraciones.", Icons.Filled.Settings, AccentPalette.Orange, Screen.AdminConfig),
+        MenuOption("Auditoría", "Histórico inmutable de acciones (hash chain).", Icons.Filled.Shield, AccentPalette.Purple, Screen.AdminAudit),
+        MenuOption("Periféricos", "Estado y prueba de impresora, lector, cajón.", Icons.Filled.Settings, AccentPalette.Yellow, Screen.AdminDevices),
         MenuOption("Estado del Parqueadero", "Disponibilidad en tiempo real.", Icons.Filled.Map, AccentPalette.Orange, Screen.Availability),
         MenuOption("Soporte al Cliente", "Reposiciones y ayuda.", Icons.AutoMirrored.Filled.HelpOutline, AccentPalette.Red, Screen.Support),
     )

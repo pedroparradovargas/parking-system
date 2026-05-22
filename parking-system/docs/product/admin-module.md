@@ -2,6 +2,21 @@
 
 **Objetivo:** definir todo lo necesario para que un administrador de parqueadero opere un parqueadero moderno y óptimo desde la app — configurar tarifas, periodicidad, precios, zonas, usuarios, clientes mensuales, ver reportes, auditar acciones y gestionar periféricos.
 
+> **Avance al 2026-05-22:** Fases A + B + C completas + consolidación.
+>
+> | Fase | Estado |
+> |---|---|
+> | A — Fundamentos (LocalRepo cableado, AuditRepository, refactor archivos, openapi, tests) | ✅ Completa |
+> | B — Tarifas + Planes + Especiales + Holidays (CRUD end-to-end) | ✅ Completa |
+> | C — Zonas (CRUD end-to-end) | ✅ Completa |
+> | D — Usuarios + 2FA | ❌ Pendiente |
+> | E — Clientes + mensualidades | ❌ Pendiente |
+> | F — Reportes avanzados + cierre de caja | ❌ Pendiente |
+> | G — Configuración + Auditoría UI | ❌ Pendiente (`AuditRepository.query` ya existe en backend; falta endpoint público + UI) |
+> | H — Periféricos UI | ❌ Pendiente |
+>
+> Total tests backend: **20 pasando** (4 + 8 + 8). 0 antes de A. UI Admin Tarifas + Zonas funcional en Desktop y Web PWA.
+
 ---
 
 ## 1. Alcance funcional del módulo Admin

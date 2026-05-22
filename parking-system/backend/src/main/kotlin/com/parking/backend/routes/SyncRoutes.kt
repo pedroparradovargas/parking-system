@@ -76,6 +76,9 @@ fun Application.registerSyncRoutes() {
                     val since = call.request.queryParameters["since"]?.toLongOrNull() ?: 0L
                     val tariffs = SyncRepository.tariffsSince(parkingId, since)
                     val zones = SyncRepository.zonesSnapshot(parkingId)
+                    val plans = AdminTariffPlanRepository.listSince(parkingId, since)
+                    val specials = AdminSpecialTariffRepository.list(parkingId)  // snapshot completo
+                    val holidays = AdminHolidayRepository.list(parkingId)        // snapshot completo
                     call.respond(
                         SyncPullResponse(
                             sinceMillis = since,
@@ -83,6 +86,9 @@ fun Application.registerSyncRoutes() {
                             tariffs = tariffs,
                             zones = zones,
                             customersChanged = 0,
+                            tariffPlans = plans,
+                            specialTariffs = specials,
+                            holidays = holidays,
                         )
                     )
                 }

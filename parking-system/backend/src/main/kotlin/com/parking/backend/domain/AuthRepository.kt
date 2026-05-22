@@ -68,7 +68,8 @@ object AuthRepository {
     fun findByUsername(username: String): AuthUser? = transaction {
         val row = UsersT.selectAll().where { UsersT.username eq username }.singleOrNull() ?: return@transaction null
         val userId = row[UsersT.id]
-        val roles = (UserRolesT innerJoin RolesT)
+        val roles = UserRolesT.join(RolesT, org.jetbrains.exposed.sql.JoinType.INNER,
+            additionalConstraint = { UserRolesT.roleId eq RolesT.id })
             .selectAll().where { UserRolesT.userId eq userId }
             .map { it[RolesT.name] }
         AuthUser(
@@ -123,7 +124,8 @@ object AuthRepository {
 
     private fun findUserById(id: String): AuthUser? = transaction {
         val row = UsersT.selectAll().where { UsersT.id eq UUID.fromString(id) }.singleOrNull() ?: return@transaction null
-        val roles = (UserRolesT innerJoin RolesT)
+        val roles = UserRolesT.join(RolesT, org.jetbrains.exposed.sql.JoinType.INNER,
+            additionalConstraint = { UserRolesT.roleId eq RolesT.id })
             .selectAll().where { UserRolesT.userId eq UUID.fromString(id) }
             .map { it[RolesT.name] }
         AuthUser(

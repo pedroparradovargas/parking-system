@@ -174,7 +174,10 @@ CREATE TABLE parking_sessions (
 ) PARTITION BY RANGE (entry_at);
 
 CREATE INDEX idx_sessions_parking_status ON parking_sessions(parking_id, status, entry_at);
-CREATE UNIQUE INDEX idx_sessions_local_id ON parking_sessions(parking_id, local_id);
+-- PostgreSQL exige que un UNIQUE sobre tabla particionada incluya la columna
+-- de partición.  Esto NO debilita la garantía de idempotencia: el cliente
+-- envía siempre el mismo `entry_at` para un `local_id` dado.
+CREATE UNIQUE INDEX idx_sessions_local_id ON parking_sessions(parking_id, local_id, entry_at);
 
 -- Particiones por mes para 2025 — las nuevas se crean con un job cron.
 CREATE TABLE parking_sessions_2025_01 PARTITION OF parking_sessions

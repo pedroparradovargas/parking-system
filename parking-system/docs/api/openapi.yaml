@@ -6,6 +6,11 @@ info:
     API REST + WebSocket del sistema de gestión de parqueaderos.
     Todas las rutas REST que no sean /healthz, /readyz o /api/v1/auth/*
     requieren Bearer JWT obtenido por /api/v1/auth/login.
+
+    **WebSocket /ws/occupancy** (no documentado en este OpenAPI por limitación
+    del estándar 3.0): tras conectar, el servidor envía `{"type":"hello"}` y
+    luego un evento `{"type":"occupancy","parkingId":"…","zone":"A1","occupancy":15,"capacity":20}`
+    cada vez que cambia la ocupación de una zona del parking del JWT.
 servers:
   - url: https://api.parking.example.com
   - url: http://localhost:8080
@@ -117,17 +122,80 @@ paths:
   /api/v1/sync/pull:
     get:
       summary: Obtener cambios desde un timestamp
+      description: |
+        Si `parkingId` se omite, el backend usa el `parkingId` claim del JWT.
+        Si se incluye y no coincide con el JWT, responde 403 tenant_mismatch.
       security: [{ bearer: [] }]
       parameters:
-        - { in: query, name: parkingId, required: true, schema: { type: string } }
-        - { in: query, name: since,     required: true, schema: { type: integer, format: int64 } }
+        - { in: query, name: parkingId, required: false, schema: { type: string } }
+        - { in: query, name: since,     required: false, schema: { type: integer, format: int64, default: 0 } }
       responses:
         "200":
           content:
             application/json:
               schema: { $ref: "#/components/schemas/SyncPullResponse" }
 
+  # ─── Admin — Tarifas (versionadas) ──────────────────────────────────────
   /api/v1/parkings/{parkingId}/tariffs:
+    get:
+      summary: Lista tarifas del parking
+      description: Por defecto, solo las vigentes (`valid_to IS NULL`). Pasar `?historic=true` para todas.
+      security: [{ bearer: [] }]
+      parameters:
+        - { in: path,  name: parkingId, required: true,  schema: { type: string } }
+        - { in: query, name: historic,  required: false, schema: { type: boolean, default: false } }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/TariffDto" }
+    post:
+      summary: Crear tarifa nueva (cierra automáticamente la vigente del mismo tipo)
+      security: [{ bearer: [] }]
+      parameters:
+        - { in: path, name: parkingId, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpsertTariffRequest" }
+      responses:
+        "201":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TariffDto" }
+
+  /api/v1/parkings/{parkingId}/tariffs/{tariffId}:
+    put:
+      summary: Editar tarifa = crear nueva versión + cerrar la anterior
+      security: [{ bearer: [] }]
+      parameters:
+        - { in: path, name: parkingId, required: true, schema: { type: string } }
+        - { in: path, name: tariffId,  required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpsertTariffRequest" }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TariffDto" }
+    delete:
+      summary: Cerrar la vigencia ahora (sin crear nueva versión)
+      security: [{ bearer: [] }]
+      parameters:
+        - { in: path, name: parkingId, required: true, schema: { type: string } }
+        - { in: path, name: tariffId,  required: true, schema: { type: string } }
+      responses:
+        "204": { description: closed }
+        "404": { description: tariff_not_found }
+
+  # ─── Admin — Planes de mensualidad ──────────────────────────────────────
+  /api/v1/parkings/{parkingId}/tariff-plans:
     get:
       security: [{ bearer: [] }]
       parameters:
@@ -138,8 +206,139 @@ paths:
             application/json:
               schema:
                 type: array
-                items: { $ref: "#/components/schemas/TariffDto" }
+                items: { $ref: "#/components/schemas/TariffPlanDto" }
+    post:
+      security: [{ bearer: [] }]
+      parameters:
+        - { in: path, name: parkingId, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpsertTariffPlanRequest" }
+      responses:
+        "201":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TariffPlanDto" }
 
+  /api/v1/parkings/{parkingId}/tariff-plans/{planId}:
+    put:
+      security: [{ bearer: [] }]
+      parameters:
+        - { in: path, name: parkingId, required: true, schema: { type: string } }
+        - { in: path, name: planId,    required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpsertTariffPlanRequest" }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TariffPlanDto" }
+    delete:
+      security: [{ bearer: [] }]
+      parameters:
+        - { in: path, name: parkingId, required: true, schema: { type: string } }
+        - { in: path, name: planId,    required: true, schema: { type: string } }
+      responses:
+        "204": { description: deleted }
+        "404": { description: tariff_plan_not_found }
+
+  # ─── Admin — Tarifas especiales (WEEKEND/HOLIDAY/DATE_RANGE/DAY_OF_WEEK) ─
+  /api/v1/parkings/{parkingId}/special-tariffs:
+    get:
+      security: [{ bearer: [] }]
+      parameters:
+        - { in: path, name: parkingId, required: true, schema: { type: string } }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/SpecialTariffDto" }
+    post:
+      security: [{ bearer: [] }]
+      parameters:
+        - { in: path, name: parkingId, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpsertSpecialTariffRequest" }
+      responses:
+        "201":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SpecialTariffDto" }
+
+  /api/v1/parkings/{parkingId}/special-tariffs/{specialId}:
+    put:
+      security: [{ bearer: [] }]
+      parameters:
+        - { in: path, name: parkingId, required: true, schema: { type: string } }
+        - { in: path, name: specialId, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpsertSpecialTariffRequest" }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SpecialTariffDto" }
+    delete:
+      security: [{ bearer: [] }]
+      parameters:
+        - { in: path, name: parkingId, required: true, schema: { type: string } }
+        - { in: path, name: specialId, required: true, schema: { type: string } }
+      responses:
+        "204": { description: deleted }
+        "404": { description: special_tariff_not_found }
+
+  # ─── Admin — Festivos ─────────────────────────────────────────────────
+  /api/v1/parkings/{parkingId}/holidays:
+    get:
+      security: [{ bearer: [] }]
+      parameters:
+        - { in: path, name: parkingId, required: true, schema: { type: string } }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/HolidayDto" }
+    post:
+      security: [{ bearer: [] }]
+      parameters:
+        - { in: path, name: parkingId, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpsertHolidayRequest" }
+      responses:
+        "201":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HolidayDto" }
+
+  /api/v1/parkings/{parkingId}/holidays/{holidayId}:
+    delete:
+      security: [{ bearer: [] }]
+      parameters:
+        - { in: path, name: parkingId, required: true, schema: { type: string } }
+        - { in: path, name: holidayId, required: true, schema: { type: string } }
+      responses:
+        "204": { description: deleted }
+        "404": { description: holiday_not_found }
+
+  # ─── Admin — Zonas ────────────────────────────────────────────────────
   /api/v1/parkings/{parkingId}/zones:
     get:
       security: [{ bearer: [] }]
@@ -152,6 +351,47 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/ZoneDto" }
+    post:
+      security: [{ bearer: [] }]
+      parameters:
+        - { in: path, name: parkingId, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpsertZoneRequest" }
+      responses:
+        "201":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ZoneDto" }
+
+  /api/v1/parkings/{parkingId}/zones/{zoneId}:
+    put:
+      security: [{ bearer: [] }]
+      parameters:
+        - { in: path, name: parkingId, required: true, schema: { type: string } }
+        - { in: path, name: zoneId,    required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpsertZoneRequest" }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ZoneDto" }
+    delete:
+      summary: Eliminar zona (rechazada si `currentOccupancy > 0`)
+      security: [{ bearer: [] }]
+      parameters:
+        - { in: path, name: parkingId, required: true, schema: { type: string } }
+        - { in: path, name: zoneId,    required: true, schema: { type: string } }
+      responses:
+        "204": { description: deleted }
+        "404": { description: zone_not_found }
+        "409": { description: zone_in_use (currentOccupancy > 0) }
 
   /api/v1/parkings/{parkingId}/reports/revenue:
     get:
@@ -271,6 +511,10 @@ components:
         tariffs: { type: array, items: { $ref: "#/components/schemas/TariffDto" } }
         zones: { type: array, items: { $ref: "#/components/schemas/ZoneDto" } }
         customersChanged: { type: integer }
+        # V2 — extensiones del módulo Admin.
+        tariffPlans: { type: array, items: { $ref: "#/components/schemas/TariffPlanDto" } }
+        specialTariffs: { type: array, items: { $ref: "#/components/schemas/SpecialTariffDto" } }
+        holidays: { type: array, items: { $ref: "#/components/schemas/HolidayDto" } }
     TariffDto:
       type: object
       properties:
@@ -295,6 +539,96 @@ components:
         capacity: { type: integer }
         currentOccupancy: { type: integer }
         allowedVehicleTypes: { type: array, items: { type: string } }
+        underMaintenance: { type: integer, default: 0 }
+        enabled: { type: boolean, default: true }
+        displayOrder: { type: integer, default: 0 }
+        notes: { type: string, nullable: true }
+    UpsertZoneRequest:
+      type: object
+      required: [code, capacity, allowedVehicleTypes]
+      properties:
+        code: { type: string }
+        capacity: { type: integer }
+        allowedVehicleTypes: { type: array, items: { type: string } }
+        underMaintenance: { type: integer, default: 0 }
+        enabled: { type: boolean, default: true }
+        displayOrder: { type: integer, default: 0 }
+        notes: { type: string, nullable: true }
+    UpsertTariffRequest:
+      type: object
+      required: [vehicleType, firstHourCents, subsequentHourCents, nightSurchargePercent, nightFromIso, nightToIso, graceMinutes, ivaPercent]
+      properties:
+        vehicleType: { type: string, enum: [CAR, MOTORCYCLE, BICYCLE, TRUCK, BUS] }
+        firstHourCents: { type: integer, format: int64 }
+        subsequentHourCents: { type: integer, format: int64 }
+        nightSurchargePercent: { type: integer }
+        nightFromIso: { type: string }
+        nightToIso: { type: string }
+        graceMinutes: { type: integer }
+        ivaPercent: { type: integer }
+        validFromMillis: { type: integer, format: int64, nullable: true }
+        validToMillis: { type: integer, format: int64, nullable: true }
+    TariffPlanDto:
+      type: object
+      properties:
+        id: { type: string }
+        parkingId: { type: string }
+        name: { type: string }
+        durationDays: { type: integer }
+        priceCents: { type: integer, format: int64 }
+        vehicleType: { type: string }
+        enabled: { type: boolean }
+        createdAtMillis: { type: integer, format: int64 }
+    UpsertTariffPlanRequest:
+      type: object
+      required: [name, durationDays, priceCents, vehicleType]
+      properties:
+        name: { type: string }
+        durationDays: { type: integer }
+        priceCents: { type: integer, format: int64 }
+        vehicleType: { type: string }
+        enabled: { type: boolean, default: true }
+    SpecialTariffRule:
+      type: string
+      enum: [WEEKEND, HOLIDAY, DATE_RANGE, DAY_OF_WEEK]
+    SpecialTariffDto:
+      type: object
+      properties:
+        id: { type: string }
+        parkingId: { type: string }
+        name: { type: string }
+        ruleType: { $ref: "#/components/schemas/SpecialTariffRule" }
+        multiplier: { type: number, format: double }
+        dateFromIso: { type: string, nullable: true }
+        dateToIso: { type: string, nullable: true }
+        dayOfWeekCsv: { type: string, nullable: true }
+        enabled: { type: boolean }
+        createdAtMillis: { type: integer, format: int64 }
+    UpsertSpecialTariffRequest:
+      type: object
+      required: [name, ruleType, multiplier]
+      properties:
+        name: { type: string }
+        ruleType: { $ref: "#/components/schemas/SpecialTariffRule" }
+        multiplier: { type: number, format: double }
+        dateFromIso: { type: string, nullable: true }
+        dateToIso: { type: string, nullable: true }
+        dayOfWeekCsv: { type: string, nullable: true }
+        enabled: { type: boolean, default: true }
+    HolidayDto:
+      type: object
+      properties:
+        id: { type: string }
+        parkingId: { type: string }
+        dateIso: { type: string }
+        name: { type: string }
+        createdAtMillis: { type: integer, format: int64 }
+    UpsertHolidayRequest:
+      type: object
+      required: [dateIso, name]
+      properties:
+        dateIso: { type: string }
+        name: { type: string }
     RevenueReportDto:
       type: object
       properties:

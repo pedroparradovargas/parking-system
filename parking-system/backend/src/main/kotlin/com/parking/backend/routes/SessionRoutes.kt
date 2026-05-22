@@ -37,11 +37,22 @@ fun Application.registerSessionRoutes() {
                         call.respond(HttpStatusCode.Forbidden, mapOf("error" to "tenant_mismatch"))
                         return@post
                     }
-                    val saved = SessionRepository.openSession(body, principal.payload.getClaim("userId").asString())
+                    val actorUserId = principal.payload.getClaim("userId").asString()
+                    val saved = SessionRepository.openSession(body, actorUserId)
                     // Notifica censo de ocupación.
                     saved.zoneId?.let { zoneId ->
                         val occ = SessionRepository.zoneOccupancy(zoneId)
                         publishOccupancy(OccupancyEvent(saved.parkingId, occ.code, occ.occupancy, occ.capacity))
+                    }
+                    runCatching {
+                        AuditRepository.append(
+                            parkingId = saved.parkingId,
+                            action = "session.opened",
+                            entity = "session",
+                            entityId = saved.id,
+                            actorUserId = actorUserId,
+                            payloadJson = "{\"plate\":\"${saved.plate}\",\"vehicleType\":\"${saved.vehicleType}\",\"zoneId\":\"${saved.zoneId.orEmpty()}\"}",
+                        )
                     }
                     call.respond(HttpStatusCode.Created, saved)
                 }
@@ -55,6 +66,7 @@ fun Application.registerSessionRoutes() {
                 post("/{sessionId}/close") {
                     val principal = call.principal<JWTPrincipal>()!!
                     val sessionId = call.parameters["sessionId"]!!
+                    val actorUserId = principal.payload.getClaim("userId").asString()
                     val body = call.receive<SessionDto>()
                     val closed = SessionRepository.closeSession(
                         sessionId = sessionId,
@@ -66,6 +78,16 @@ fun Application.registerSessionRoutes() {
                     closed.zoneId?.let { zoneId ->
                         val occ = SessionRepository.zoneOccupancy(zoneId)
                         publishOccupancy(OccupancyEvent(closed.parkingId, occ.code, occ.occupancy, occ.capacity))
+                    }
+                    runCatching {
+                        AuditRepository.append(
+                            parkingId = closed.parkingId,
+                            action = "session.closed",
+                            entity = "session",
+                            entityId = sessionId,
+                            actorUserId = actorUserId,
+                            payloadJson = "{\"totalCents\":${closed.totalCents ?: 0},\"ivaCents\":${closed.ivaCents ?: 0}}",
+                        )
                     }
                     call.respond(closed.copy(status = SessionStatus.CLOSED))
                 }

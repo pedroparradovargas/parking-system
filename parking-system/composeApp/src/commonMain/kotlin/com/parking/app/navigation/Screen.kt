@@ -11,7 +11,13 @@ import com.parking.app.ui.screens.rented.RentedVehicleEntryScreen
 import com.parking.app.ui.screens.reservation.PaymentQrScreen
 import com.parking.app.ui.screens.reservation.ReservationScreen
 import com.parking.app.ui.screens.support.CustomerSupportScreen
+import com.parking.app.ui.screens.audit.AuditLogScreen
+import com.parking.app.ui.screens.config.ParkingConfigScreen
+import com.parking.app.ui.screens.customers.AdminCustomersScreen
+import com.parking.app.ui.screens.reports.AdminReportsScreen
 import com.parking.app.ui.screens.tariff.TariffManagementScreen
+import com.parking.app.ui.screens.users.AdminUsersScreen
+import com.parking.app.ui.screens.zones.AdminZonesScreen
 
 /**
  * Modelo de navegación que sigue las 9 secciones del mockup Figma
@@ -31,6 +37,13 @@ sealed interface Screen {
     data object Availability : Screen
     data object Reports : Screen
     data object Support : Screen
+    data object AdminZones : Screen
+    data object AdminUsers : Screen
+    data object AdminCustomers : Screen
+    data object AdminReports : Screen
+    data object AdminConfig : Screen
+    data object AdminAudit : Screen
+    data object AdminDevices : Screen
 
     /** Flujo interno de Reservas → QR (no aparece en tab nav). */
     data object Cashier : Screen
@@ -54,6 +67,13 @@ fun AppNav(current: Screen, navigateTo: (Screen) -> Unit) {
         is Screen.Availability -> ParkingAvailabilityScreen(onBack = back)
         is Screen.Reports -> DashboardScreen()
         is Screen.Support -> CustomerSupportScreen(onBack = back)
+        is Screen.AdminZones -> AdminZonesScreen(onBack = back)
+        is Screen.AdminUsers -> AdminUsersScreen(onBack = back)
+        is Screen.AdminCustomers -> AdminCustomersScreen(onBack = back)
+        is Screen.AdminReports -> AdminReportsScreen(onBack = back)
+        is Screen.AdminConfig -> ParkingConfigScreen(onBack = back)
+        is Screen.AdminAudit -> AuditLogScreen(onBack = back)
+        is Screen.AdminDevices -> com.parking.app.ui.screens.devices.DeviceStatusScreen(onBack = back)
 
         is Screen.Cashier -> CashierScreen()
         is Screen.Reservation -> ReservationScreen(onConfirm = { id -> navigateTo(Screen.PaymentQr(id)) })

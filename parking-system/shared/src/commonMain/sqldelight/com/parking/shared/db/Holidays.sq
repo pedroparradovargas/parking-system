@@ -1,0 +1,26 @@
+-- Calendario de festivos editable por parking, cacheado offline.
+
+CREATE TABLE IF NOT EXISTS holidays (
+    id              TEXT NOT NULL PRIMARY KEY,
+    parking_id      TEXT NOT NULL,
+    date_iso        TEXT NOT NULL,   -- "YYYY-MM-DD"
+    name            TEXT NOT NULL,
+    created_at_ms   INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_holidays_parking ON holidays(parking_id, date_iso);
+
+selectByParking:
+SELECT * FROM holidays WHERE parking_id = ?
+ORDER BY date_iso ASC;
+
+upsert:
+INSERT INTO holidays(id, parking_id, date_iso, name, created_at_ms)
+VALUES (?, ?, ?, ?, ?)
+ON CONFLICT(id) DO UPDATE SET
+    date_iso      = excluded.date_iso,
+    name          = excluded.name,
+    created_at_ms = excluded.created_at_ms;
+
+deleteById:
+DELETE FROM holidays WHERE id = ?;

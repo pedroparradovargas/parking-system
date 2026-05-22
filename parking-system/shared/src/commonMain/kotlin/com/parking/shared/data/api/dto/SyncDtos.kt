@@ -36,4 +36,10 @@ data class SyncPullResponse(
     val tariffs: List<TariffDto> = emptyList(),
     val zones: List<ZoneDto> = emptyList(),
     val customersChanged: Int = 0,
+    // V2: extensiones de Admin.  El cliente puede persistirlos cuando agregue
+    // soporte SQLDelight local; por ahora el backend ya los exporta para que
+    // clientes Web/Móvil los consuman directamente desde el repositorio remoto.
+    val tariffPlans: List<TariffPlanDto> = emptyList(),
+    val specialTariffs: List<SpecialTariffDto> = emptyList(),
+    val holidays: List<HolidayDto> = emptyList(),
 )

@@ -1,5 +1,6 @@
 package com.parking.app.di
 
+import com.parking.app.state.AuthTokenHolder
 import com.parking.shared.data.api.ParkingApiClient
 import com.parking.shared.data.api.applyCommonConfig
 import com.parking.shared.data.api.createPlatformHttpClient
@@ -16,6 +17,9 @@ import org.koin.dsl.module
  *
  * Cada plataforma combina este módulo con su propio (Android añade
  * `Context`, Desktop añade impresora/datafono, etc.).
+ *
+ * El `AuthTokenHolder` se registra `single` y se inyecta en el HttpClient
+ * vía `tokenProvider`.  El auto-login del AppState lo pobla al arrancar.
  */
 fun appCommonModule(baseUrl: String, parkingId: String, deviceId: String): Module = module {
     single {
@@ -24,8 +28,13 @@ fun appCommonModule(baseUrl: String, parkingId: String, deviceId: String): Modul
     }
     single { LocalRepository(get()) }
 
+    single { AuthTokenHolder() }
+
     single {
-        val http = createPlatformHttpClient { applyCommonConfig(baseUrl = baseUrl) }
+        val tokens = get<AuthTokenHolder>()
+        val http = createPlatformHttpClient {
+            applyCommonConfig(baseUrl = baseUrl, tokenProvider = { tokens.accessToken })
+        }
         ParkingApiClient(http)
     }
 

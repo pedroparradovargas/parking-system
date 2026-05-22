@@ -67,6 +67,16 @@ fun Application.registerAuthRoutes() {
                     )
                     val refresh = AuthRepository.issueRefreshToken(user.id, cfg.security.refreshTokenTtlSeconds)
                     AuthRepository.touchLastLogin(user.id)
+                    runCatching {
+                        AuditRepository.append(
+                            parkingId = user.parkingId,
+                            action = "login.success",
+                            entity = "user",
+                            entityId = user.id,
+                            actorUserId = user.id,
+                            payloadJson = "{\"username\":\"${user.username}\"}",
+                        )
+                    }
 
                     call.respond(
                         LoginResponse(
@@ -96,6 +106,16 @@ fun Application.registerAuthRoutes() {
                         cfg.security.accessTokenTtlSeconds, user.id, user.parkingId, user.roles,
                     )
                     val newRefresh = AuthRepository.rotateRefreshToken(refresh, user.id, cfg.security.refreshTokenTtlSeconds)
+                    runCatching {
+                        AuditRepository.append(
+                            parkingId = user.parkingId,
+                            action = "refresh.success",
+                            entity = "user",
+                            entityId = user.id,
+                            actorUserId = user.id,
+                            payloadJson = "{}",
+                        )
+                    }
                     call.respond(
                         LoginResponse(
                             accessToken = access,

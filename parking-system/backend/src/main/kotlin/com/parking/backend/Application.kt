@@ -5,6 +5,12 @@ import com.parking.backend.config.configureDatabase
 import com.parking.backend.config.configureKoin
 import com.parking.backend.config.configureSecurity
 import com.parking.backend.config.configureWebsockets
+import com.parking.backend.routes.registerAdminConfigAuditRoutes
+import com.parking.backend.routes.registerAdminCustomerRoutes
+import com.parking.backend.routes.registerAdminReportsRoutes
+import com.parking.backend.routes.registerAdminTariffRoutes
+import com.parking.backend.routes.registerAdminUserRoutes
+import com.parking.backend.routes.registerAdminZoneRoutes
 import com.parking.backend.routes.registerAuthRoutes
 import com.parking.backend.routes.registerOtherRoutes
 import com.parking.backend.routes.registerSessionRoutes
@@ -57,4 +63,10 @@ fun Application.module() {
     registerSessionRoutes()
     registerSyncRoutes()
     registerOtherRoutes()
+    registerAdminTariffRoutes()
+    registerAdminZoneRoutes()
+    registerAdminUserRoutes()
+    registerAdminCustomerRoutes()
+    registerAdminReportsRoutes()
+    registerAdminConfigAuditRoutes()
 }

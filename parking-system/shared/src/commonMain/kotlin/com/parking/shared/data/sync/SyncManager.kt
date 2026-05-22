@@ -85,10 +85,24 @@ class SyncManager(
     private suspend fun pullChanges(): SyncOutcome {
         return try {
             val resp = api.pullChanges(parkingId, _state.value.lastSyncMillis)
-            // Sólo persistimos cambios estructurales locales: tarifas/zonas.
+            // Persiste localmente los catálogos admin (tariff_plans, special_tariffs,
+            // holidays) para que la UI pueda mostrarlos sin red.  Los `tariffs` y
+            // `zones` se actualizan vía sus propios métodos de UpsertX cuando la
+            // UI consume el repo — aquí sólo registramos.
+            if (resp.tariffPlans.isNotEmpty()) {
+                local.upsertTariffPlans(resp.tariffPlans)
+                Napier.i("Pull: ${resp.tariffPlans.size} planes de mensualidad cacheados")
+            }
+            if (resp.specialTariffs.isNotEmpty()) {
+                local.upsertSpecialTariffs(resp.specialTariffs)
+                Napier.i("Pull: ${resp.specialTariffs.size} tarifas especiales cacheadas")
+            }
+            if (resp.holidays.isNotEmpty()) {
+                local.upsertHolidays(resp.holidays)
+                Napier.i("Pull: ${resp.holidays.size} festivos cacheados")
+            }
             if (resp.tariffs.isNotEmpty()) {
-                // El mapeo DTO → dominio queda en composeApp para no acoplar shared a UI.
-                Napier.i("Pull: ${resp.tariffs.size} tarifas actualizadas")
+                Napier.i("Pull: ${resp.tariffs.size} tarifas en el payload (sin persistir local — UI consume vía API directo)")
             }
             _state.value = _state.value.copy(lastSyncMillis = resp.nowMillis)
             SyncOutcome.Success(0, 0, 0)
