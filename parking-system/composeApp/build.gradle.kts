@@ -19,10 +19,12 @@ plugins {
 }
 
 kotlin {
-    // jvmToolchain(17) provee target JVM 17 a TODOS los targets JVM automáticamente.
-    // No mezclar con `compilerOptions { jvmTarget }` a nivel del extension multiplataforma:
-    // KotlinCommonCompilerOptions no expone `jvmTarget` (es específico de KotlinJvmCompilerOptions).
     jvmToolchain(17)
+
+    @OptIn(ExperimentalKotlinGradlePluginApi::class)
+    compilerOptions {
+        freeCompilerArgs.add("-Xexpect-actual-classes")
+    }
 
     androidTarget {
         compilations.all {

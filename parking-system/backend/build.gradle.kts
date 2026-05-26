@@ -34,6 +34,10 @@ dependencies {
     implementation(libs.flyway.postgresql)
     implementation(libs.bundles.exposed)
 
+    // Excel export
+    implementation(libs.apache.poi)
+    implementation(libs.apache.poi.ooxml)
+
     // Auth / crypto
     implementation(libs.bcrypt)
     implementation(libs.java.jwt)

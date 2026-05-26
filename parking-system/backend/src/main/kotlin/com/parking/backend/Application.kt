@@ -8,6 +8,7 @@ import com.parking.backend.config.configureWebsockets
 import com.parking.backend.routes.registerAdminConfigAuditRoutes
 import com.parking.backend.routes.registerAdminCustomerRoutes
 import com.parking.backend.routes.registerAdminReportsRoutes
+import com.parking.backend.routes.registerCashSessionRoutes
 import com.parking.backend.routes.registerAdminTariffRoutes
 import com.parking.backend.routes.registerAdminUserRoutes
 import com.parking.backend.routes.registerAdminZoneRoutes
@@ -69,4 +70,5 @@ fun Application.module() {
     registerAdminCustomerRoutes()
     registerAdminReportsRoutes()
     registerAdminConfigAuditRoutes()
+    registerCashSessionRoutes()
 }

@@ -50,6 +50,9 @@ kotest = "5.9.1"
 mockk = "1.13.13"
 junit = "5.11.3"
 
+# Excel export
+apache-poi = "5.3.0"
+
 # Compose color picker — solo utilidad común
 material3 = "1.7.0"
 
@@ -119,6 +122,10 @@ sqldelight-coroutines = { module = "app.cash.sqldelight:coroutines-extensions", 
 sqldelight-primitive-adapters = { module = "app.cash.sqldelight:primitive-adapters", version.ref = "sqldelight" }
 # Dialecto SQLite 3.38: necesario para INSERT ... ON CONFLICT DO UPDATE (UPSERT).
 sqldelight-sqlite-3-38-dialect = { module = "app.cash.sqldelight:sqlite-3-38-dialect", version.ref = "sqldelight" }
+
+# --- Excel export ---
+apache-poi = { module = "org.apache.poi:poi", version.ref = "apache-poi" }
+apache-poi-ooxml = { module = "org.apache.poi:poi-ooxml", version.ref = "apache-poi" }
 
 # --- Seguridad ---
 bcrypt = { module = "at.favre.lib:bcrypt", version.ref = "bcrypt" }

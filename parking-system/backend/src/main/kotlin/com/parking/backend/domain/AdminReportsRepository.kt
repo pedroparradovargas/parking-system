@@ -5,11 +5,13 @@ import com.parking.shared.data.api.dto.CashClosingRowDto
 import com.parking.shared.data.api.dto.MonthlyCustomersReportDto
 import com.parking.shared.data.api.dto.TopPlateRowDto
 import com.parking.shared.data.api.dto.TopPlatesReportDto
+import org.apache.poi.xssf.usermodel.XSSFWorkbook
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
+import java.io.ByteArrayOutputStream
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -150,6 +152,94 @@ object AdminReportsRepository {
         }
         sb.appendLine("TOTAL,,${report.rows.sumOf { it.sessionsCount }},${report.grandTotalCents},${report.grandIvaCents}")
         return sb.toString()
+    }
+
+    fun cashClosingXlsx(report: CashClosingReportDto): ByteArray {
+        val wb = XSSFWorkbook()
+        val sheet = wb.createSheet("Cierre de Caja")
+
+        val headerStyle = wb.createCellStyle().apply {
+            val font = wb.createFont()
+            font.bold = true
+            setFont(font)
+        }
+        val moneyStyle = wb.createCellStyle().apply {
+            dataFormat = wb.createDataFormat().getFormat("#,##0")
+        }
+
+        val headerRow = sheet.createRow(0)
+        listOf("Fecha", "Operador", "Sesiones", "Total (centavos)", "IVA (centavos)").forEachIndexed { i, title ->
+            headerRow.createCell(i).apply {
+                setCellValue(title)
+                cellStyle = headerStyle
+            }
+        }
+
+        report.rows.forEachIndexed { idx, r ->
+            val row = sheet.createRow(idx + 1)
+            row.createCell(0).setCellValue(r.dayIso)
+            row.createCell(1).setCellValue(r.operatorName)
+            row.createCell(2).setCellValue(r.sessionsCount.toDouble())
+            row.createCell(3).apply { setCellValue(r.totalCents.toDouble()); cellStyle = moneyStyle }
+            row.createCell(4).apply { setCellValue(r.ivaCents.toDouble()); cellStyle = moneyStyle }
+        }
+
+        val totalRow = sheet.createRow(report.rows.size + 1)
+        totalRow.createCell(0).apply { setCellValue("TOTAL"); cellStyle = headerStyle }
+        totalRow.createCell(2).apply {
+            setCellValue(report.rows.sumOf { it.sessionsCount }.toDouble())
+            cellStyle = headerStyle
+        }
+        totalRow.createCell(3).apply {
+            setCellValue(report.grandTotalCents.toDouble())
+            cellStyle = moneyStyle
+        }
+        totalRow.createCell(4).apply {
+            setCellValue(report.grandIvaCents.toDouble())
+            cellStyle = moneyStyle
+        }
+
+        repeat(5) { sheet.autoSizeColumn(it) }
+
+        val out = ByteArrayOutputStream()
+        wb.use { it.write(out) }
+        return out.toByteArray()
+    }
+
+    fun topPlatesXlsx(report: TopPlatesReportDto): ByteArray {
+        val wb = XSSFWorkbook()
+        val sheet = wb.createSheet("Top Placas")
+
+        val headerStyle = wb.createCellStyle().apply {
+            val font = wb.createFont()
+            font.bold = true
+            setFont(font)
+        }
+        val moneyStyle = wb.createCellStyle().apply {
+            dataFormat = wb.createDataFormat().getFormat("#,##0")
+        }
+
+        val headerRow = sheet.createRow(0)
+        listOf("Placa", "Sesiones", "Total (centavos)", "Minutos totales").forEachIndexed { i, title ->
+            headerRow.createCell(i).apply {
+                setCellValue(title)
+                cellStyle = headerStyle
+            }
+        }
+
+        report.rows.forEachIndexed { idx, r ->
+            val row = sheet.createRow(idx + 1)
+            row.createCell(0).setCellValue(r.plate)
+            row.createCell(1).setCellValue(r.sessionsCount.toDouble())
+            row.createCell(2).apply { setCellValue(r.totalCents.toDouble()); cellStyle = moneyStyle }
+            row.createCell(3).setCellValue(r.totalMinutes.toDouble())
+        }
+
+        repeat(4) { sheet.autoSizeColumn(it) }
+
+        val out = ByteArrayOutputStream()
+        wb.use { it.write(out) }
+        return out.toByteArray()
     }
 
     private fun parseDate(iso: String, default: Instant): Instant = try {
